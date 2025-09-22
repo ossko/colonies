@@ -39,6 +39,7 @@ type ColoniesServer struct {
 	retention               bool
 	retentionPolicy         int64
 	retentionPeriod         int
+	unprivilegedExecutors   bool
 }
 
 func CreateColoniesServer(db database.Database,
@@ -55,7 +56,8 @@ func CreateColoniesServer(db database.Database,
 	allowExecutorReregister bool,
 	retention bool,
 	retentionPolicy int64,
-	retentionPeriod int) *ColoniesServer {
+	retentionPeriod int,
+	unprivilegedExecutors bool) *ColoniesServer {
 	server := &ColoniesServer{}
 	server.ginHandler = gin.Default()
 	server.ginHandler.Use(cors.Default())
@@ -80,6 +82,7 @@ func CreateColoniesServer(db database.Database,
 	server.allowExecutorReregister = allowExecutorReregister
 	server.retention = retention
 	server.retentionPolicy = retentionPolicy
+	server.unprivilegedExecutors = unprivilegedExecutors
 
 	log.WithFields(log.Fields{"Port": port,
 		"TLS":                     tls,

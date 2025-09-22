@@ -330,6 +330,16 @@ func parseEnv() {
 		}
 		CheckError(err)
 	}
+
+	unprivilegedExecutors := os.Getenv("COLONIES_UNPRIVILEGED_EXECUTORS")
+	if unprivilegedExecutors != "" {
+		UnprivilegedExecutors, err = strconv.ParseBool(unprivilegedExecutors)
+		if err != nil {
+			log.Error("failed to parse COLONIES_UNPRIVILEGED_EXECUTORS")
+		}
+		CheckError(err)
+	}
+
 }
 
 func checkDevEnv() {

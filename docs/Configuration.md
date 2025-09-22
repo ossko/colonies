@@ -84,3 +84,10 @@ Set the variable above and generate a memory usage PDF report using the command 
 ```console
 go tool pprof --pdf  http://rocinante:6060/debug/pprof/allocs
 ```
+
+### Unprivileged executors
+By default ColonyOS executors are allowed to submit functions and workflows. In scenarios where this is an undesireable feature this flag can be set to only allow task and workflow submission by users and Colony administrators.
+
+```console
+export COLONIES_UNPRIVILEGED_EXECUTORS=1
+```

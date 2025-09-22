@@ -180,7 +180,8 @@ var serverStartCmd = &cobra.Command{
 			AllowExecutorReregister,
 			Retention,
 			RetentionPolicy,
-			retentionPeriod)
+			retentionPeriod,
+			UnprivilegedExecutors)
 
 		if InitDB {
 			err := db.Initialize()

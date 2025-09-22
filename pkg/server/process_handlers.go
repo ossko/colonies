@@ -16,21 +16,33 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (server *ColoniesServer) handleSubmitHTTPRequest(c *gin.Context, recoveredID string, payloadType string, jsonString string) {
+func (server *ColoniesServer) parseSubmitFunctionSpecMsg(payloadType string, jsonString string) (*rpc.SubmitFunctionSpecMsg, error) {
 	msg, err := rpc.CreateSubmitFunctionSpecMsgFromJSON(jsonString)
+
 	if err != nil {
 		log.Warning(err)
-		if server.handleHTTPError(c, errors.New("Failed to submit process, invalid JSON"), http.StatusBadRequest) {
-			return
-		}
+		return nil, errors.New("failed to submit process, invalid JSON")
 	}
 
 	if msg.MsgType != payloadType {
-		server.handleHTTPError(c, errors.New("Failed to submit process spec, msg.MsgType does not match payloadType"), http.StatusBadRequest)
-		return
+		return nil, errors.New("failed to submit process spec, msg.MsgType does not match payloadType")
 	}
+
 	if msg.FunctionSpec == nil {
-		server.handleHTTPError(c, errors.New("Failed to submit process spec, msg.FunctionSpec is nil"), http.StatusBadRequest)
+		return nil, errors.New("failed to submit process spec, msg.FunctionSpec is nil")
+	}
+
+	err = VerifyFunctionSpec(msg.FunctionSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
+}
+
+func (server *ColoniesServer) handleSubmitHTTPRequest(c *gin.Context, recoveredID string, payloadType string, jsonString string) {
+	msg, err := server.parseSubmitFunctionSpecMsg(payloadType, jsonString)
+	if server.handleHTTPError(c, err, http.StatusBadRequest) {
 		return
 	}
 
@@ -39,41 +51,20 @@ func (server *ColoniesServer) handleSubmitHTTPRequest(c *gin.Context, recoveredI
 		return
 	}
 
-	err = VerifyFunctionSpec(msg.FunctionSpec)
-	if server.handleHTTPError(c, err, http.StatusBadRequest) {
-		return
-	}
-
 	process := core.CreateProcess(msg.FunctionSpec)
 
-	initiatorName, err := resolveInitiator(msg.FunctionSpec.Conditions.ColonyName, recoveredID, server.db)
+	initiator, err := deriveInitiator(msg.FunctionSpec.Conditions.ColonyName, recoveredID, server.db)
 	if server.handleHTTPError(c, err, http.StatusInternalServerError) {
 		return
 	}
 
-	process.InitiatorID = recoveredID
-	process.InitiatorName = initiatorName
-
-	executor, err := server.db.GetExecutorByID(recoveredID)
-	if server.handleHTTPError(c, err, http.StatusBadRequest) {
+	if server.unprivilegedExecutors && initiator.Type == Executor {
+		server.handleHTTPError(c, errors.New("unprivileged executors cannot initiate processes"), http.StatusForbidden)
 		return
 	}
 
-	if executor != nil {
-		process.InitiatorName = executor.Name
-	} else {
-		user, err := server.db.GetUserByID(msg.FunctionSpec.Conditions.ColonyName, recoveredID)
-		if server.handleHTTPError(c, err, http.StatusBadRequest) {
-			return
-		}
-		if user != nil {
-			process.InitiatorName = user.Name
-		} else {
-			if server.handleHTTPError(c, errors.New("Could not derive InitiatorName"), http.StatusBadRequest) {
-				return
-			}
-		}
-	}
+	process.InitiatorID = recoveredID
+	process.InitiatorName = initiator.Name
 
 	addedProcess, err := server.controller.addProcess(process)
 	if server.handleHTTPError(c, err, http.StatusBadRequest) {
@@ -100,7 +91,7 @@ func (server *ColoniesServer) handleSubmitHTTPRequest(c *gin.Context, recoveredI
 // It handles four main scenarios:
 // 1. Non-leader node - redirects request to cluster leader for exclusive assignment
 // 2. Colony assignments are paused - waits for resume signal or timeout
-// 3. Process found - assigns and returns the process immediately  
+// 3. Process found - assigns and returns the process immediately
 // 4. No process available - waits for new processes to be submitted
 //
 // Flow:
@@ -114,7 +105,7 @@ func (server *ColoniesServer) handleSubmitHTTPRequest(c *gin.Context, recoveredI
 //
 // Parameters:
 //   - c: Gin HTTP context for the request
-//   - recoveredID: Executor ID recovered from authentication 
+//   - recoveredID: Executor ID recovered from authentication
 //   - payloadType: Expected message type for validation
 //   - jsonString: Request body containing assignment parameters
 //   - originalRequest: Raw request for leader redirection in cluster mode
@@ -259,7 +250,7 @@ func (server *ColoniesServer) handleAssignProcessHTTPRequest(c *gin.Context, rec
 				continue
 			}
 		}
-		
+
 		// No timeout specified or timeout occurred, exit loop
 		break
 	}

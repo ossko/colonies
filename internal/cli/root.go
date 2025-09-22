@@ -140,6 +140,7 @@ var SecondsBack int
 var Snapshot bool
 var IDPath string
 var PrvKeyPath string
+var UnprivilegedExecutors bool
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Verbose (debugging)")

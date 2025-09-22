@@ -118,7 +118,8 @@ var devCmd = &cobra.Command{
 			AllowExecutorReregister,
 			Retention,
 			RetentionPolicy,
-			retentionPeriod)
+			retentionPeriod,
+			UnprivilegedExecutors)
 
 		go coloniesServer.ServeForever()
 
