@@ -65,7 +65,7 @@ jobs:
         PKGS=$(go list ./pkg/... | grep -v '/monitoring$' | tr '\n' ' ')
         # Run tests with coverage
         # Use -coverpkg to measure client package coverage through server tests
-        go test -p 1 -race -coverprofile=coverage.raw -covermode=atomic -coverpkg=./pkg/... $PKGS
+        go test -race -coverprofile=coverage.raw -covermode=atomic -coverpkg=./pkg/... $PKGS
         # Filter out test utilities, mocks, and monitoring from coverage report
         grep -v 'pkg/server/test_utils.go' coverage.raw | \
         grep -v 'pkg/monitoring/' | \
