@@ -285,6 +285,7 @@ github.com/spf13/pflag
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
+github.com/stretchr/testify/require
 # github.com/t-pwk/go-fibonacci v1.0.0
 ## explicit
 github.com/t-pwk/go-fibonacci

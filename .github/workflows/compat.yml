@@ -1,0 +1,79 @@
+name: Wire compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  apicompat:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.5
+      - name: Run wire API compatibility suite
+        run: make test-compat
+        env:
+          COLONIES_DB_HOST: localhost
+          COLONIES_DB_USER: postgres
+          COLONIES_DB_PASSWORD: postgres
+
+  old-client:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.5
+
+      - name: Build current server binary
+        run: CGO_ENABLED=0 go build -o /tmp/colonies-server ./cmd/main.go
+
+      - name: Build smokeclient against the previous release's client SDK
+        run: |
+          OLD_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git describe --tags --abbrev=0)
+          echo "Building smokeclient against $OLD_TAG"
+          git worktree add /tmp/old-tree "$OLD_TAG"
+          mkdir /tmp/old-tree/cmd_smokeclient
+          cp test/apicompat/smokeclient/main.go /tmp/old-tree/cmd_smokeclient/main.go
+          cd /tmp/old-tree
+          go build -o /tmp/smokeclient ./cmd_smokeclient
+
+      - name: Run old client against new server
+        run: |
+          ./scripts/start-compat-server.sh /tmp/colonies-server /tmp/compat.env
+          source /tmp/compat.env
+          /tmp/smokeclient
+          kill "$SERVER_PID"
