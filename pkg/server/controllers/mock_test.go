@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/colonyos/colonies/pkg/cluster"
 	"github.com/colonyos/colonies/pkg/constants"
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database"
 	"github.com/colonyos/colonies/pkg/database/postgresql"
+	"github.com/colonyos/colonies/pkg/utils"
 )
 
 // portCounter is used to allocate unique ports for each test to avoid port conflicts
@@ -591,32 +594,32 @@ func (db *DatabaseMock) Unlock() error { return nil }
 func (db *DatabaseMock) ApplyRetentionPolicy(retentionPeriod int64) error { return nil }
 
 // Test utility functions
-func createFakeColoniesController() (*ColoniesController, *DatabaseMock) {
-	// Use atomic counter to get unique ports for each test to avoid "address already in use" errors
-	portOffset := atomic.AddInt32(&portCounter, 1)
-	etcdClientPort := 24100 + int(portOffset)*10
-	etcdPeerPort := 23100 + int(portOffset)*10
-	relayPort := 25100 + int(portOffset)*10
-	nodeName := fmt.Sprintf("etcd-%d", portOffset)
-	dataPath := fmt.Sprintf("/tmp/colonies/etcd-%d", portOffset)
+func newTestColoniesController(db database.Database, name string) *ColoniesController {
+	// Unique node names keep etcd data directories apart; dynamic ports and
+	// temp dirs let test packages run in parallel
+	offset := atomic.AddInt32(&portCounter, 1)
+	ports := utils.FreePortsOrPanic(4)
+	nodeName := fmt.Sprintf("%s-%d", name, offset)
+	dataPath, err := os.MkdirTemp("", "colonies-etcd-")
+	if err != nil {
+		panic(err)
+	}
 
-	node := cluster.Node{Name: nodeName, Host: "localhost", EtcdClientPort: etcdClientPort, EtcdPeerPort: etcdPeerPort, RelayPort: relayPort, APIPort: constants.TESTPORT}
+	node := cluster.Node{Name: nodeName, Host: "localhost", EtcdClientPort: ports[0], EtcdPeerPort: ports[1], RelayPort: ports[2], APIPort: ports[3]}
 	clusterConfig := cluster.Config{}
 	clusterConfig.AddNode(node)
+	return CreateColoniesController(db, node, clusterConfig, dataPath, constants.GENERATOR_TRIGGER_PERIOD, constants.CRON_TRIGGER_PERIOD, false, -1, 500, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second)
+}
+
+func createFakeColoniesController() (*ColoniesController, *DatabaseMock) {
 	dbMock := &DatabaseMock{}
-	return CreateColoniesController(dbMock, node, clusterConfig, dataPath, constants.GENERATOR_TRIGGER_PERIOD, constants.CRON_TRIGGER_PERIOD, false, -1, 500, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second), dbMock
+	return newTestColoniesController(dbMock, "etcd"), dbMock
 }
 
 func createTestColoniesController(db *postgresql.PQDatabase) *ColoniesController {
-	node := cluster.Node{Name: "test", Host: "localhost", EtcdClientPort: 24101, EtcdPeerPort: 23101, RelayPort: 25101, APIPort: constants.TESTPORT}
-	clusterConfig := cluster.Config{}
-	clusterConfig.AddNode(node)
-	return CreateColoniesController(db, node, clusterConfig, "/tmp/colonies/etcd_test", constants.GENERATOR_TRIGGER_PERIOD, constants.CRON_TRIGGER_PERIOD, false, -1, 500, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second)
+	return newTestColoniesController(db, "test")
 }
 
 func createTestColoniesController2(db *postgresql.PQDatabase) *ColoniesController {
-	node := cluster.Node{Name: "test2", Host: "localhost", EtcdClientPort: 24102, EtcdPeerPort: 23102, RelayPort: 25102, APIPort: constants.TESTPORT}
-	clusterConfig := cluster.Config{}
-	clusterConfig.AddNode(node)
-	return CreateColoniesController(db, node, clusterConfig, "/tmp/colonies/etcd_test2", constants.GENERATOR_TRIGGER_PERIOD, constants.CRON_TRIGGER_PERIOD, false, -1, 500, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second)
+	return newTestColoniesController(db, "test2")
 }
