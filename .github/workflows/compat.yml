@@ -58,12 +58,36 @@ jobs:
         with:
           go-version: 1.25.5
 
+      - name: Resolve previous release tag
+        id: oldtag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            # Forks created with "copy the default branch only" carry no tag
+            # refs; fetch them from the parent repository if this is a fork.
+            PARENT=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.parent.full_name // empty' || true)
+            if [ -n "$PARENT" ]; then
+              echo "No local tags; fetching tags from parent repo $PARENT"
+              git fetch --tags "https://github.com/$PARENT.git" || echo "Tag fetch from $PARENT failed"
+            fi
+          fi
+          OLD_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -z "$OLD_TAG" ]; then
+            echo "::warning::No release tag reachable from HEAD; skipping old-client wire compat test"
+          else
+            echo "Previous release tag: $OLD_TAG"
+          fi
+          echo "tag=$OLD_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Build current server binary
+        if: steps.oldtag.outputs.tag != ''
         run: CGO_ENABLED=0 go build -o /tmp/colonies-server ./cmd/main.go
 
       - name: Build smokeclient against the previous release's client SDK
+        if: steps.oldtag.outputs.tag != ''
         run: |
-          OLD_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git describe --tags --abbrev=0)
+          OLD_TAG='${{ steps.oldtag.outputs.tag }}'
           echo "Building smokeclient against $OLD_TAG"
           git worktree add /tmp/old-tree "$OLD_TAG"
           mkdir /tmp/old-tree/cmd_smokeclient
@@ -72,6 +96,7 @@ jobs:
           go build -o /tmp/smokeclient ./cmd_smokeclient
 
       - name: Run old client against new server
+        if: steps.oldtag.outputs.tag != ''
         run: |
           ./scripts/start-compat-server.sh /tmp/colonies-server /tmp/compat.env
           source /tmp/compat.env
