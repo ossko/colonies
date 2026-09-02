@@ -28,6 +28,8 @@ The deployment docker-compose files expect `colonyos/colonies:latest`. Using a d
 ```bash
 make test              # Run all tests: needs Postgres on localhost:5432 (make startdb)
                        # and an S3 server on localhost:9000 for pkg/fs
+make test-compat       # Frozen wire API compatibility suite (see test/apicompat/README.md)
+make test-all          # test + test-compat
 make github_test       # Alias for test (used by CI)
 ```
 

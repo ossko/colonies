@@ -47,6 +47,13 @@ test:
 
 github_test: test
 
+# Wire API compatibility suite: black-box tests against the server binary.
+# Frozen contract, see test/apicompat/README.md. Needs Postgres (make startdb).
+test-compat:
+	@go test -tags apicompat -count=1 ./test/apicompat/
+
+test-all: test test-compat
+
 install:
 	cp ./bin/colonies /usr/local/bin
 	cp ./lib/libcryptolib.so /usr/local/lib
