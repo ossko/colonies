@@ -1,0 +1,70 @@
+name: Hosted runner experiment
+
+# Experiment: can the main test suite (go.yml, currently self-hosted) run
+# reliably on GitHub-hosted runners now that test packages are hermetic
+# (dynamic ports, per-process databases)? Runs the full suite in several
+# identical parallel jobs to collect flake samples per trigger. The main
+# suspect is the ~20 embedded etcd instances, whose heartbeat/election
+# deadlines are sensitive to fsync latency on shared runner disks.
+#
+# Trigger manually (workflow_dispatch) or by pushing to this branch. If a
+# handful of triggers stay green, go.yml can likely move to ubuntu-latest.
+
+on:
+  push:
+    branches: [hosted-runner-experiment]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3, 4, 5]
+    services:
+      minio:
+        image: fclairamb/minio-github-actions
+        ports:
+          - 9000:9000
+        env:
+          MINIO_DOMAIN: localhost
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.5
+
+      - name: Build
+        run: make
+
+      - name: Test
+        run: time make test
+        env:
+          TZ: Europe/Stockholm
+          AWS_S3_ENDPOINT: localhost:9000
+          AWS_S3_ACCESSKEY: minioadmin
+          AWS_S3_SECRETKEY: minioadmin
+          AWS_S3_TLS: false
+          AWS_S3_SKIPVERIFY: false
+          AWS_S3_BUCKET: test
+          COLONIES_DB_USER: postgres
+          COLONIES_DB_PASSWORD: postgres
+          COLONIES_DB_HOST: localhost
