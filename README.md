@@ -141,7 +141,7 @@ The [Colonies Dashboard](https://github.com/colonyos/dashboard) provides a web U
 - [Executors](https://github.com/colonyos/executors) - Pre-built executor implementations
 
 ## Development
-The repository contains a development container configuration to simplify development environment setup. You can use it locally or in a [GitHub Codespace](https://docs.github.com/en/codespaces). The configuration will launch a TimescaleDB-insance for the ColonyOS database, a MinIO instance for the ColonyOS file system and the actual development container. It will automatically generate required credentials and keys unique to your environment, no furhter configuration needed. 
+The repository contains a development container configuration to simplify development environment setup. You can use it locally or in a [GitHub Codespace](https://docs.github.com/en/codespaces). It provides a Go toolchain with Docker-in-Docker, so the dependencies can be started inside the container: `make startdb` for TimescaleDB, `make starts3` for the SeaweedFS S3 server used by the file system, or `docker compose up -d` for the full Colonies stack.
 
 **Local Development (VS Code):**
 
