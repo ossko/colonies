@@ -2,9 +2,9 @@
 package constants
 
 // API Limits - Maximum values for API requests to prevent abuse
-const MAX_COUNT = 100         // Maximum number of items that can be requested in list operations
-const MAX_DAYS = 30           // Maximum number of days for log search operations
-const MAX_LOG_COUNT = 500     // Maximum number of log entries that can be requested at once
+const MAX_COUNT = 100     // Maximum number of items that can be requested in list operations
+const MAX_DAYS = 30       // Maximum number of days for log search operations
+const MAX_LOG_COUNT = 500 // Maximum number of log entries that can be requested at once
 
 // Test Configuration - Default values used in test environments
 const TESTHOST = "localhost" // Default hostname for test servers

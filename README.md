@@ -168,10 +168,26 @@ For detailed instructions on building containers including multi-platform builds
 
 ### Testing
 
+The tests need a PostgreSQL server on `localhost:5432` and an S3 server on
+`localhost:9000`, both of which can be started with Docker:
+
 ```bash
+make startdb           # Start TimescaleDB
+make starts3           # Start SeaweedFS and print the AWS_S3_* variables to export
+```
+
+Export the `AWS_S3_*` variables printed by `make starts3` and set a timezone,
+then run the tests:
+
+```bash
+export TZ=Europe/Stockholm
 make test              # Run all tests
 make github_test       # Run tests for CI (no color output)
 ```
+
+Test packages use per-process databases and dynamic ports, so they run in
+parallel. To stress the suite under load, use for example
+`go test -race -count=10 -timeout 0 ./...`.
 
 ### Code Coverage
 

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -206,6 +205,21 @@ func prepareTests(t *testing.T) (*client.ColoniesClient, *Server, string, chan b
 	return prepareTestsWithRetention(t, false)
 }
 
+// Retention settings for test servers created with retention enabled. The
+// policy must leave enough room for a test to submit, assign, close and
+// inspect a process before it is deleted, even under heavy load (for example
+// go test -race -count=10 ./...), so it is much longer than the worker period.
+const (
+	testRetentionPolicySeconds = 5
+	testRetentionPeriodMillis  = 500
+)
+
+// Cron trigger period for single-node test servers. Production evaluates crons
+// once a second, which makes every cron test wait two to three seconds for the
+// first trigger. A shorter tick keeps the same semantics (the one second cron
+// interval is still the floor) while cutting the waiting to just over a second.
+const testCronPeriodMillis = 100
+
 func prepareTestsWithRetention(t *testing.T, retention bool) (*client.ColoniesClient, *Server, string, chan bool) {
 	// Dynamic ports and a per-test etcd data directory allow test packages to
 	// run in parallel without colliding on fixed ports or /tmp/colonies. The
@@ -236,7 +250,7 @@ func prepareTestsWithRetention(t *testing.T, retention bool) (*client.ColoniesCl
 	reserved[1].Release()
 	reserved[2].Release()
 	reserved[3].Release()
-	server := CreateServer(db, apiPort, EnableTLS, "", "", node, clusterConfig, etcdDataPath, constants.GENERATOR_TRIGGER_PERIOD, constants.CRON_TRIGGER_PERIOD, false, false, retention, 1, 500, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second)
+	server := CreateServer(db, apiPort, EnableTLS, "", "", node, clusterConfig, etcdDataPath, constants.GENERATOR_TRIGGER_PERIOD, testCronPeriodMillis, false, false, retention, testRetentionPolicySeconds, testRetentionPeriodMillis, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second)
 
 	done := make(chan bool)
 	reserved[0].Release()
@@ -251,7 +265,25 @@ func prepareTestsWithRetention(t *testing.T, retention bool) (*client.ColoniesCl
 		done <- true
 	}()
 
+	waitForServer(t, client)
+
 	return client, server, serverPrvKey, done
+}
+
+// waitForServer blocks until the test server answers health checks. The server
+// listens in a goroutine, so without this a test on a loaded machine can send
+// its first request before the port is bound and fail with a connection error.
+func waitForServer(t *testing.T, client *client.ColoniesClient) {
+	deadline := time.Now().Add(30 * time.Second)
+	var err error
+	for time.Now().Before(deadline) {
+		err = client.CheckHealth()
+		if err == nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("test server did not become ready: %v", err)
 }
 
 func GenerateDiamondtWorkflowSpec(colonyName string) *core.WorkflowSpec {
@@ -450,22 +482,22 @@ func startCluster(t *testing.T, db database.Database, size int, exclusiveAssign 
 	return servers
 }
 
+// WaitForCluster blocks until every server in the cluster answers health
+// checks in the same pass, so one healthy node polled repeatedly cannot
+// satisfy the wait on behalf of nodes that are still starting.
 func WaitForCluster(t *testing.T, cluster []ServerInfo) {
-	serverReady := 0
 	for {
+		serverReady := 0
 		for _, s := range cluster {
 			client := client.CreateColoniesClient("localhost", s.Node.APIPort, true, true)
-			err := client.CheckHealth()
-			if err == nil {
+			if err := client.CheckHealth(); err == nil {
 				serverReady++
-			} else {
-				time.Sleep(50 * time.Millisecond)
-				fmt.Println(err)
-			}
-			if serverReady == len(cluster) {
-				return
 			}
 		}
+		if serverReady == len(cluster) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
