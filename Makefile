@@ -53,8 +53,11 @@ install:
 	cp ./lib/libcryptolib.so /usr/local/lib
 	cp ./lib/libcfslib.so /usr/local/lib
 
-startdb: 
-	docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=rFcLGNkgsNtksg6Pgtn9CumL4xXBQ7 --restart unless-stopped timescale/timescaledb:latest-pg16
+# max_connections is raised from the default 100 because go test runs many
+# packages in parallel, each with its own database, connection pool and
+# TimescaleDB background worker
+startdb:
+	docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=rFcLGNkgsNtksg6Pgtn9CumL4xXBQ7 --restart unless-stopped timescale/timescaledb:latest-pg16 -c max_connections=300
 
 nukedb:
 	@echo "Nuking TimescaleDB containers and volumes..."
