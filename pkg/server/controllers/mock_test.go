@@ -3,8 +3,8 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/colonyos/colonies/pkg/cluster"
@@ -610,17 +610,14 @@ func (db *DatabaseMock) Unlock() error                                    { retu
 func (db *DatabaseMock) ApplyRetentionPolicy(retentionPeriod int64) error { return nil }
 
 // Test utility functions
-func newTestColoniesController(db database.Database, name string) *ColoniesController {
+func newTestColoniesController(t *testing.T, db database.Database, name string) *ColoniesController {
+	t.Helper()
 	// Unique node names keep etcd data directories apart; dynamic ports and
 	// temp dirs let test packages run in parallel
 	offset := atomic.AddInt32(&portCounter, 1)
 	reserved := utils.ReservePortsOrPanic(4)
 	nodeName := fmt.Sprintf("%s-%d", name, offset)
-	dataPath, err := os.MkdirTemp("", "colonies-etcd-")
-	if err != nil {
-		utils.ReleasePorts(reserved)
-		panic(err)
-	}
+	dataPath := t.TempDir()
 
 	node := cluster.Node{Name: nodeName, Host: "localhost", EtcdClientPort: reserved[0].Port(), EtcdPeerPort: reserved[1].Port(), RelayPort: reserved[2].Port(), APIPort: reserved[3].Port()}
 	clusterConfig := cluster.Config{}
@@ -631,15 +628,15 @@ func newTestColoniesController(db database.Database, name string) *ColoniesContr
 	return CreateColoniesController(db, node, clusterConfig, dataPath, constants.GENERATOR_TRIGGER_PERIOD, constants.CRON_TRIGGER_PERIOD, false, -1, 500, time.Duration(constants.DEFAULT_STALE_EXECUTOR_DURATION)*time.Second)
 }
 
-func createFakeColoniesController() (*ColoniesController, *DatabaseMock) {
+func createFakeColoniesController(t *testing.T) (*ColoniesController, *DatabaseMock) {
 	dbMock := &DatabaseMock{}
-	return newTestColoniesController(dbMock, "etcd"), dbMock
+	return newTestColoniesController(t, dbMock, "etcd"), dbMock
 }
 
-func createTestColoniesController(db *postgresql.PQDatabase) *ColoniesController {
-	return newTestColoniesController(db, "test")
+func createTestColoniesController(t *testing.T, db *postgresql.PQDatabase) *ColoniesController {
+	return newTestColoniesController(t, db, "test")
 }
 
-func createTestColoniesController2(db *postgresql.PQDatabase) *ColoniesController {
-	return newTestColoniesController(db, "test2")
+func createTestColoniesController2(t *testing.T, db *postgresql.PQDatabase) *ColoniesController {
+	return newTestColoniesController(t, db, "test2")
 }

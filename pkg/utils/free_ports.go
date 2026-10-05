@@ -11,44 +11,6 @@ import (
 const portProbeNetwork = "tcp4"
 const portProbeAddr = "0.0.0.0:0"
 
-// FreePorts asks the kernel for n distinct free TCP ports. The listeners are
-// closed before returning, so there is a small window in which another process
-// could grab a port. Prefer ReservePorts when there is slow setup work between
-// allocating a port and binding it.
-func FreePorts(n int) ([]int, error) {
-	reservations, err := ReservePorts(n)
-	if err != nil {
-		return nil, err
-	}
-
-	ports := make([]int, 0, n)
-	for _, r := range reservations {
-		ports = append(ports, r.Port())
-	}
-	ReleasePorts(reservations)
-
-	return ports, nil
-}
-
-// FreePort returns a single free TCP port.
-func FreePort() (int, error) {
-	ports, err := FreePorts(1)
-	if err != nil {
-		return 0, err
-	}
-	return ports[0], nil
-}
-
-// FreePortsOrPanic is a convenience wrapper for test setup code without error
-// returns.
-func FreePortsOrPanic(n int) []int {
-	ports, err := FreePorts(n)
-	if err != nil {
-		panic("failed to allocate free ports: " + err.Error() + " (n=" + strconv.Itoa(n) + ")")
-	}
-	return ports
-}
-
 // ReservedPort is a free TCP port that stays bound until Release is called, so
 // no other process can be handed the same port in the meantime. Test setups
 // that do slow work between allocating a port and binding it (starting etcd,
