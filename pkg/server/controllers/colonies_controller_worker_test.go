@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
+	"github.com/colonyos/colonies/pkg/database/testsupport"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCleanupStaleExecutors_SkipsZeroLastHeardFrom(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_CLEANUP_ZERO")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_CLEANUP_ZERO")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -45,7 +45,7 @@ func TestCleanupStaleExecutors_SkipsZeroLastHeardFrom(t *testing.T) {
 }
 
 func TestCleanupStaleExecutors_RemovesStaleExecutor(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_CLEANUP_STALE")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_CLEANUP_STALE")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -88,7 +88,7 @@ func TestCleanupStaleExecutors_RemovesStaleExecutor(t *testing.T) {
 }
 
 func TestCleanupStaleExecutors_KeepsRecentExecutor(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_CLEANUP_RECENT")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_CLEANUP_RECENT")
 	defer db.Close()
 	assert.Nil(t, err)
 

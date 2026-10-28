@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/colonyos/colonies/pkg/core"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
+	"github.com/colonyos/colonies/pkg/database/testsupport"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateStandaloneValidator(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 
 	validator := CreateValidator(db)

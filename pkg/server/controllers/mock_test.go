@@ -11,7 +11,6 @@ import (
 	"github.com/colonyos/colonies/pkg/constants"
 	"github.com/colonyos/colonies/pkg/core"
 	"github.com/colonyos/colonies/pkg/database"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
 	"github.com/colonyos/colonies/pkg/utils"
 )
 
@@ -635,10 +634,10 @@ func createFakeColoniesController(t *testing.T) (*ColoniesController, *DatabaseM
 	return newTestColoniesController(t, dbMock, "etcd"), dbMock
 }
 
-func createTestColoniesController(t *testing.T, db *postgresql.PQDatabase) *ColoniesController {
+func createTestColoniesController(t *testing.T, db database.Database) *ColoniesController {
 	return newTestColoniesController(t, db, "test")
 }
 
-func createTestColoniesController2(t *testing.T, db *postgresql.PQDatabase) *ColoniesController {
+func createTestColoniesController2(t *testing.T, db database.Database) *ColoniesController {
 	return newTestColoniesController(t, db, "test2")
 }

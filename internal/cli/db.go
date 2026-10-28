@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/colonyos/colonies/pkg/database/postgresql"
+	"github.com/colonyos/colonies/pkg/database"
+	// Blank import: registers the PostgreSQL driver in the database registry.
+	_ "github.com/colonyos/colonies/pkg/database/postgresql"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -55,17 +57,30 @@ func parseDBEnv() {
 		DBPassword = os.Getenv("COLONIES_DB_PASSWORD")
 	}
 
-	timescaleDBEnv := os.Getenv("COLONIES_DB_TIMESCALEDB")
-	if timescaleDBEnv == "true" {
-		TimescaleDB = true
-	} else {
-		TimescaleDB = false
-	}
-
 	initDBStr := os.Getenv("COLONIES_INITDB")
 	if initDBStr == "true" {
 		InitDB = true
 	}
+}
+
+// dbConfig builds the shared DatabaseConfig from the CLI flags and parsed
+// environment. Engine-specific features are expressed as driver options:
+// the "timescale" option enables TimescaleDB hypertables in the PostgreSQL
+// driver (COLONIES_DB_TIMESCALEDB=true).
+func dbConfig() database.DatabaseConfig {
+	config := database.DatabaseConfig{
+		Type:     database.DatabaseType(DBType),
+		Host:     DBHost,
+		Port:     DBPort,
+		User:     DBUser,
+		Password: DBPassword,
+		Name:     DBName,
+		Prefix:   DBPrefix,
+	}
+	if os.Getenv("COLONIES_DB_TIMESCALEDB") == "true" {
+		config.SetOption("timescale", "true")
+	}
+	return config
 }
 
 var dbCreateCmd = &cobra.Command{
@@ -76,21 +91,14 @@ var dbCreateCmd = &cobra.Command{
 		parseEnv()
 		parseDBEnv()
 
-		var db *postgresql.PQDatabase
-		for {
-			db = postgresql.CreatePQDatabase(DBHost, DBPort, DBUser, DBPassword, DBName, DBPrefix, TimescaleDB)
-			err := db.Connect()
-			if err != nil {
-				log.WithFields(log.Fields{"Error": err}).Error("Failed to call db.Connect(), retrying in 1 second ...")
-				time.Sleep(1 * time.Second)
-			} else {
-				break
-			}
-		}
+		db, err := database.CreateDatabase(dbConfig())
+		CheckError(err)
 
-		log.WithFields(log.Fields{"Host": DBHost, "Port": DBPort, "User": DBUser, "Password": "**********************", "Prefix": DBPrefix}).Error("Connected to PostgreSQL database")
+		database.ConnectWithRetry(db, time.Second)
 
-		err := db.Initialize()
+		log.WithFields(log.Fields{"Host": DBHost, "Port": DBPort, "User": DBUser, "Password": "**********************", "Prefix": DBPrefix}).Info("Connected to database")
+
+		err = db.Initialize()
 		if err != nil {
 			log.WithFields(log.Fields{"Error": err}).Error("Failed to call db.Initialize()")
 			os.Exit(0)
@@ -116,10 +124,12 @@ var dbDropCmd = &cobra.Command{
 		reply, _ := reader.ReadString('\n')
 
 		if reply == "YES\n" {
-			log.WithFields(log.Fields{"DBHost": DBHost, "DBPort": DBPort, "DBUser": DBUser, "DBPassword": "*******************", "DBName": DBName, "UseTLS": UseTLS, "TimescaleDB": TimescaleDB}).Info("Connecting to PostgreSQL database")
+			log.WithFields(log.Fields{"DBHost": DBHost, "DBPort": DBPort, "DBUser": DBUser, "DBPassword": "*******************", "DBName": DBName, "UseTLS": UseTLS}).Info("Connecting to database")
 
-			db := postgresql.CreatePQDatabase(DBHost, DBPort, DBUser, DBPassword, DBName, DBPrefix, TimescaleDB)
-			err := db.Connect()
+			db, err := database.CreateDatabase(dbConfig())
+			CheckError(err)
+
+			err = db.Connect()
 			CheckError(err)
 
 			err = db.Drop()

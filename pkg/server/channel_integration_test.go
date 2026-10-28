@@ -10,7 +10,7 @@ import (
 	"github.com/colonyos/colonies/pkg/cluster"
 	"github.com/colonyos/colonies/pkg/constants"
 	"github.com/colonyos/colonies/pkg/core"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
+	"github.com/colonyos/colonies/pkg/database/testsupport"
 	"github.com/colonyos/colonies/pkg/security/crypto"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +27,7 @@ import (
 // through HTTP channel communication to process completion.
 func TestChannelEndToEndIntegration(t *testing.T) {
 	// Setup test database
-	db, err := postgresql.PrepareTestsWithPrefix("CHANNEL_TEST_")
+	db, err := testsupport.PrepareTestsWithPrefix("CHANNEL_TEST_")
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -60,7 +60,7 @@ func TestChannelEndToEndIntegration(t *testing.T) {
 		"",
 		thisNode,
 		clusterConfig,
-		true,  // clustering enabled: this test exercises etcd maintenance behavior
+		true, // clustering enabled: this test exercises etcd maintenance behavior
 		t.TempDir(),
 		10,    // generator period
 		10,    // cron period
@@ -232,7 +232,7 @@ func TestChannelEndToEndIntegration(t *testing.T) {
 // when a process fails (not just when it succeeds).
 func TestChannelCleanupOnProcessFail(t *testing.T) {
 	// Setup test database
-	db, err := postgresql.PrepareTestsWithPrefix("CHANNEL_FAIL_TEST_")
+	db, err := testsupport.PrepareTestsWithPrefix("CHANNEL_FAIL_TEST_")
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -265,7 +265,7 @@ func TestChannelCleanupOnProcessFail(t *testing.T) {
 		"",
 		thisNode,
 		clusterConfig,
-		true,  // clustering enabled: this test exercises etcd maintenance behavior
+		true, // clustering enabled: this test exercises etcd maintenance behavior
 		t.TempDir(),
 		10,    // generator period
 		10,    // cron period

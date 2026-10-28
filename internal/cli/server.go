@@ -10,7 +10,6 @@ import (
 	"github.com/colonyos/colonies/pkg/client"
 	"github.com/colonyos/colonies/pkg/cluster"
 	"github.com/colonyos/colonies/pkg/database"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
 	"github.com/colonyos/colonies/pkg/server"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -216,49 +215,25 @@ var serverStartCmd = &cobra.Command{
 			log.Info("Insecure mode enabled, skipping TLS certificate checks")
 		}
 
+		config := dbConfig()
+		config.DataDir = DataDir
+
 		log.WithFields(log.Fields{
-			"DBType":      DBType,
-			"DBHost":      DBHost,
-			"DBPort":      DBPort,
-			"DBName":      DBName,
-			"DBPrefix":    DBPrefix,
-			"TimescaleDB": TimescaleDB,
-			"DataDir":     DataDir,
+			"DBType":    DBType,
+			"DBHost":    DBHost,
+			"DBPort":    DBPort,
+			"DBName":    DBName,
+			"DBPrefix":  DBPrefix,
+			"Timescale": config.GetOptionDefault("timescale", "false"),
+			"DataDir":   DataDir,
 		}).Info("Server starting with database configuration")
 
-		dbConfig := database.DatabaseConfig{
-			Type:        database.DatabaseType(DBType),
-			Host:        DBHost,
-			Port:        DBPort,
-			User:        DBUser,
-			Password:    DBPassword,
-			Name:        DBName,
-			Prefix:      DBPrefix,
-			TimescaleDB: TimescaleDB,
-			DataDir:     DataDir,
-		}
-
 		log.WithField("DatabaseType", DBType).Info("Creating database using factory")
-		db, err := database.CreateDatabase(dbConfig)
+		db, err := database.CreateDatabase(config)
 		CheckError(err)
 
-		// Connect to database (only needed for PostgreSQL)
-		if DBType == "postgresql" {
-			log.Info("Connecting to PostgreSQL database...")
-			for {
-				if postgresDB, ok := db.(*postgresql.PQDatabase); ok {
-					err := postgresDB.Connect()
-					if err != nil {
-						log.WithFields(log.Fields{"Error": err}).Error("Failed to connect to PostgreSQL database, retrying...")
-						time.Sleep(1 * time.Second)
-					} else {
-						log.Info("Successfully connected to PostgreSQL database")
-						break
-					}
-				}
-			}
-		}
-
+		log.Info("Connecting to database ...")
+		database.ConnectWithRetry(db, time.Second)
 		log.WithFields(log.Fields{
 			"DatabaseType": DBType,
 			"Host":         DBHost,
@@ -267,7 +242,7 @@ var serverStartCmd = &cobra.Command{
 			"Password":     "*******************",
 			"Name":         DBName,
 			"UseTLS":       UseTLS,
-			"TimescaleDB":  TimescaleDB,
+			"Timescale":    config.GetOptionDefault("timescale", "false"),
 		}).Info("Database connection established")
 
 		node := cluster.Node{Name: EtcdName, Host: EtcdHost, APIPort: ServerPort, EtcdClientPort: EtcdClientPort, EtcdPeerPort: EtcdPeerPort, RelayPort: RelayPort}
@@ -352,4 +327,3 @@ var serverAliveCmd = &cobra.Command{
 		os.Exit(0)
 	},
 }
-

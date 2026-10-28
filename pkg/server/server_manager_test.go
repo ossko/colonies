@@ -7,7 +7,7 @@ import (
 
 	"github.com/colonyos/colonies/pkg/cluster"
 	"github.com/colonyos/colonies/pkg/constants"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
+	"github.com/colonyos/colonies/pkg/database/testsupport"
 	"github.com/colonyos/colonies/pkg/security/crypto"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +37,7 @@ func testServerManagerNode(t *testing.T) (cluster.Node, func()) {
 }
 
 func TestServerManagerCreation(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -59,7 +59,7 @@ func TestServerManagerCreation(t *testing.T) {
 }
 
 func TestServerManagerBackendFactoryRegistration(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -94,7 +94,7 @@ func TestServerManagerBackendFactoryRegistration(t *testing.T) {
 }
 
 func TestServerManagerConfigManagement(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -145,7 +145,7 @@ func TestServerManagerConfigManagement(t *testing.T) {
 }
 
 func TestServerManagerLifecycle(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -239,7 +239,7 @@ func TestServerManagerLifecycle(t *testing.T) {
 }
 
 func TestServerManagerMissingFactory(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -274,7 +274,7 @@ func TestServerManagerMissingFactory(t *testing.T) {
 }
 
 func TestServerManagerStopTimeout(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 
@@ -337,7 +337,7 @@ func TestServerManagerStopTimeout(t *testing.T) {
 }
 
 func TestServerManagerHealthCheck(t *testing.T) {
-	db, err := postgresql.PrepareTests()
+	db, err := testsupport.PrepareTests()
 	assert.Nil(t, err)
 	defer db.Close()
 

@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/colonyos/colonies/pkg/backends"
 	"github.com/colonyos/colonies/pkg/constants"
 	"github.com/colonyos/colonies/pkg/core"
-	"github.com/colonyos/colonies/pkg/database/postgresql"
-	"github.com/colonyos/colonies/pkg/backends"
+	"github.com/colonyos/colonies/pkg/database/testsupport"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,7 +34,7 @@ func TestColoniesControllerInvalidDB(t *testing.T) {
 }
 
 func TestColoniesControllerAddProcess(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_ADD_PROCESS")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_ADD_PROCESS")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -58,7 +58,7 @@ func TestColoniesControllerAddProcess(t *testing.T) {
 }
 
 func TestColoniesControllerAssignExecutor(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_ASSIGN_EXECUTOR")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_ASSIGN_EXECUTOR")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -87,7 +87,7 @@ func TestColoniesControllerAssignExecutor(t *testing.T) {
 
 // notest
 func TestColoniesControllerAssignExecutorConcurrency(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_ASSIGN_CONCURRENCY")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_ASSIGN_CONCURRENCY")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -171,7 +171,7 @@ func TestColoniesControllerPauseResumeAssignments(t *testing.T) {
 }
 
 func TestColoniesControllerPauseResumeAssignmentsWithEtcdServer(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_PAUSE_RESUME")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_PAUSE_RESUME")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -213,7 +213,7 @@ func TestColoniesControllerGetters(t *testing.T) {
 	cronPeriod := controller.GetCronPeriod()
 	assert.Equal(t, constants.CRON_TRIGGER_PERIOD, cronPeriod)
 
-	// Test GetGeneratorPeriod  
+	// Test GetGeneratorPeriod
 	generatorPeriod := controller.GetGeneratorPeriod()
 	assert.Equal(t, constants.GENERATOR_TRIGGER_PERIOD, generatorPeriod)
 
@@ -296,7 +296,7 @@ func TestColoniesControllerSubscribeProcesses(t *testing.T) {
 
 // Test additional process operations
 func TestColoniesControllerProcessOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_PROCESS_OPS")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_PROCESS_OPS")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -347,12 +347,12 @@ func TestColoniesControllerWebSocketHandling(t *testing.T) {
 
 	// Test SubscribeProcess with invalid process ID
 	subscription := &backends.RealtimeSubscription{}
-	
+
 	dbMock.ReturnError = "GetProcessByID"
 	err := controller.SubscribeProcess("invalid-process-id", subscription)
 	assert.NotNil(t, err)
 
-	// Test SubscribeProcesses with invalid executor ID  
+	// Test SubscribeProcesses with invalid executor ID
 	dbMock.ReturnError = "GetExecutorByID"
 	err = controller.SubscribeProcesses("invalid-executor-id", subscription)
 	assert.NotNil(t, err)
@@ -362,7 +362,7 @@ func TestColoniesControllerWebSocketHandling(t *testing.T) {
 
 // Test process graph operations
 func TestColoniesControllerProcessGraphOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_PROCESS_GRAPH")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_PROCESS_GRAPH")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -371,13 +371,13 @@ func TestColoniesControllerProcessGraphOperations(t *testing.T) {
 
 	// Test GetProcessGraphByID with non-existent ID
 	graph, err := controller.GetProcessGraphByID("non-existent-id")
-	assert.Nil(t, err)    // No error is returned for non-existent process graph
-	assert.Nil(t, graph)  // But the graph should be nil
+	assert.Nil(t, err)   // No error is returned for non-existent process graph
+	assert.Nil(t, graph) // But the graph should be nil
 }
 
 // Test assignment functionality
 func TestColoniesControllerAssignmentOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_ASSIGNMENT")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_ASSIGNMENT")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -418,14 +418,14 @@ func TestColoniesControllerCronOperations(t *testing.T) {
 	defer controller.Stop()
 
 	cronSpec := &core.Cron{
-		ID:             "test-cron-id",
-		ColonyName:     "test-colony",
-		Name:           "test-cron",
-		CronExpression: "0 0 * * *",
-		Interval:       3600,
-		Random:         false,
-		NextRun:        time.Time{},
-		LastRun:        time.Time{},
+		ID:                 "test-cron-id",
+		ColonyName:         "test-colony",
+		Name:               "test-cron",
+		CronExpression:     "0 0 * * *",
+		Interval:           3600,
+		Random:             false,
+		NextRun:            time.Time{},
+		LastRun:            time.Time{},
 		PrevProcessGraphID: "",
 	}
 
@@ -455,7 +455,7 @@ func TestColoniesControllerGeneratorOperations(t *testing.T) {
 	defer controller.Stop()
 
 	generator := &core.Generator{
-		ID:         "test-generator-id", 
+		ID:         "test-generator-id",
 		ColonyName: "test-colony",
 		Name:       "test-generator",
 		Trigger:    3600,
@@ -475,7 +475,7 @@ func TestColoniesControllerGeneratorOperations(t *testing.T) {
 
 // Test process lifecycle methods with real database
 func TestColoniesControllerProcessLifecycleOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_LIFECYCLE")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_LIFECYCLE")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -525,7 +525,7 @@ func TestColoniesControllerProcessLifecycleOperations(t *testing.T) {
 
 // Test process graph operations
 func TestColoniesControllerProcessGraphOperations2(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_PROCESS_GRAPH_2")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_PROCESS_GRAPH_2")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -580,7 +580,7 @@ func TestColoniesControllerProcessGraphOperations2(t *testing.T) {
 
 // Test assignment and unassignment operations
 func TestColoniesControllerAssignmentOperations2(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_ASSIGNMENT_2")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_ASSIGNMENT_2")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -612,14 +612,14 @@ func TestColoniesControllerAssignmentOperations2(t *testing.T) {
 		assert.Nil(t, err)
 	}
 
-	// Test ResetProcess 
+	// Test ResetProcess
 	err = controller.ResetProcess(addedProcess.ID)
 	assert.Nil(t, err)
 }
 
 // Test attribute operations
 func TestColoniesControllerAttributeOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_ATTRIBUTES")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_ATTRIBUTES")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -652,7 +652,7 @@ func TestColoniesControllerAttributeOperations(t *testing.T) {
 
 // Test function management operations
 func TestColoniesControllerFunctionOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_FUNCTIONS")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_FUNCTIONS")
 	defer db.Close()
 	assert.Nil(t, err)
 
@@ -684,10 +684,9 @@ func TestColoniesControllerFunctionOperations(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-
 // Test database reset and other utility functions
 func TestColoniesControllerDatabaseAndUtilityOperations(t *testing.T) {
-	db, err := postgresql.PrepareTestsWithPrefix("TEST_UTILITIES")
+	db, err := testsupport.PrepareTestsWithPrefix("TEST_UTILITIES")
 	defer db.Close()
 	assert.Nil(t, err)
 

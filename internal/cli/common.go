@@ -284,12 +284,8 @@ func parseEnv() {
 		StaleExecutorDuration = 600 // Default 10 minutes
 	}
 
-	timescaleDBEnv := os.Getenv("COLONIES_DB_TIMESCALEDB")
-	if timescaleDBEnv == "true" {
-		TimescaleDB = true
-	} else {
-		TimescaleDB = false
-	}
+	// COLONIES_DB_TIMESCALEDB is translated into the "timescale" driver
+	// option in dbConfig() (internal/cli/db.go)
 
 	if ColonyName == "" {
 		ColonyName = os.Getenv("COLONIES_COLONY_NAME")
