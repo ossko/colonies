@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/colonyos/colonies/pkg/database"
-	// Blank import: registers the PostgreSQL driver in the database registry.
+	// Blank imports: register the database drivers in the registry.
 	_ "github.com/colonyos/colonies/pkg/database/postgresql"
+	_ "github.com/colonyos/colonies/pkg/database/sqlite"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,8 @@ func init() {
 	dbCmd.PersistentFlags().IntVarP(&DBPort, "dbport", "", DefaultDBPort, "Colonies database port")
 	dbCmd.PersistentFlags().StringVarP(&DBUser, "dbuser", "", "", "Colonies database user")
 	dbCmd.PersistentFlags().StringVarP(&DBPassword, "dbpassword", "", "", "Colonies database password")
+	dbCmd.PersistentFlags().StringVarP(&DBName, "dbname", "", DBName, "Database name (the sqlite driver uses it as the storage filename)")
+	dbCmd.PersistentFlags().StringVarP(&DataDir, "datadir", "", DataDir, "Data directory (the sqlite driver stores its database file here)")
 }
 
 var dbCmd = &cobra.Command{
@@ -76,6 +79,7 @@ func dbConfig() database.DatabaseConfig {
 		Password: DBPassword,
 		Name:     DBName,
 		Prefix:   DBPrefix,
+		DataDir:  DataDir,
 	}
 	if os.Getenv("COLONIES_DB_TIMESCALEDB") == "true" {
 		config.SetOption("timescale", "true")

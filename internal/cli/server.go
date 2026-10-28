@@ -216,7 +216,6 @@ var serverStartCmd = &cobra.Command{
 		}
 
 		config := dbConfig()
-		config.DataDir = DataDir
 
 		log.WithFields(log.Fields{
 			"DBType":    DBType,

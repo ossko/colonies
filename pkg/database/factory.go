@@ -9,6 +9,7 @@ type DatabaseType string
 
 const (
 	PostgreSQL DatabaseType = "postgresql"
+	SQLite     DatabaseType = "sqlite"
 )
 
 // DatabaseConfig carries the connection settings for a database driver.
@@ -22,7 +23,7 @@ const (
 //     set; drivers that only support DSN-style addressing ignore the
 //     Host/Port settings and vice versa.
 //   - Options: driver-specific key/value settings (e.g. "timescale" for the
-//     PostgreSQL driver, "bucket" or "dataDir" for embedded drivers).
+//     PostgreSQL driver, "path" or "journal" for the SQLite driver).
 //
 // Engine-specific features MUST be expressed as Options, never as shared
 // struct fields.

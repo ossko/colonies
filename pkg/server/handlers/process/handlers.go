@@ -20,7 +20,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-
 func VerifyFunctionSpec(funcSpec *core.FunctionSpec) error {
 	if funcSpec.Priority < constants.MIN_PRIORITY || funcSpec.Priority > constants.MAX_PRIORITY {
 		msg := "Failed to submit function spec, priority outside range [" + strconv.Itoa(constants.MIN_PRIORITY) + ", " + strconv.Itoa(constants.MAX_PRIORITY) + "]"
@@ -173,7 +172,6 @@ func (h *Handlers) RegisterHandlers(handlerRegistry *registry.HandlerRegistry) e
 	return nil
 }
 
-
 func (h *Handlers) HandleSubmit(c backends.Context, recoveredID string, payloadType string, jsonString string) {
 	msg, err := rpc.CreateSubmitFunctionSpecMsgFromJSON(jsonString)
 	if err != nil {
@@ -258,7 +256,7 @@ func (h *Handlers) HandleSubmit(c backends.Context, recoveredID string, payloadT
 // It handles four main scenarios:
 // 1. Non-leader node - redirects request to cluster leader for exclusive assignment
 // 2. Colony assignments are paused - waits for resume signal or timeout
-// 3. Process found - assigns and returns the process immediately  
+// 3. Process found - assigns and returns the process immediately
 // 4. No process available - waits for new processes to be submitted
 //
 // Flow:
@@ -272,7 +270,7 @@ func (h *Handlers) HandleSubmit(c backends.Context, recoveredID string, payloadT
 //
 // Parameters:
 //   - c: Gin HTTP context for the request
-//   - recoveredID: Executor ID recovered from authentication 
+//   - recoveredID: Executor ID recovered from authentication
 //   - payloadType: Expected message type for validation
 //   - jsonString: Request body containing assignment parameters
 //   - originalRequest: Raw request for leader redirection in cluster mode

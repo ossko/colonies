@@ -1,0 +1,430 @@
+package sqlite
+
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
+)
+
+func (db *SQLiteDatabase) AddExecutor(executor *core.Executor) error {
+	if executor == nil {
+		return errors.New("Executor is nil")
+	}
+
+	existingExecutor, err := db.GetExecutorByName(executor.ColonyName, executor.Name)
+	if err != nil {
+		return err
+	}
+
+	// If an UNREGISTERED executor exists with the same name, reactivate it instead of creating a new record
+	// This supports executors without generation-based naming (e.g., static-named reconcilers)
+	if existingExecutor != nil {
+		if existingExecutor.State == core.UNREGISTERED {
+			// Reactivate the executor by updating its state to PENDING and other fields
+			sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET EXECUTOR_ID=$1, EXECUTOR_TYPE=$2, STATE=$3, COMMISSIONTIME=$4, LASTHEARDFROM=$5, LONG=$6, LAT=$7, LOCNAME=$8, LOCDESC=$9, HARDWARE=$10, SOFTWARE=$11, ALLOCATIONS=$12, BLUEPRINT_ID=$13, BLUEPRINT_GEN=$14, LOCATION_NAME=$15 WHERE COLONY_NAME=$16 AND NAME=$17`
+
+			allocationsJSONBytes, err := json.Marshal(executor.Allocations)
+			if err != nil {
+				return err
+			}
+
+			hardwareJSONBytes, err := json.Marshal(executor.Capabilities.Hardware)
+			if err != nil {
+				return err
+			}
+
+			softwareJSONBytes, err := json.Marshal(executor.Capabilities.Software)
+			if err != nil {
+				return err
+			}
+
+			_, err = db.postgresql.Exec(sqlStatement, executor.ID, executor.Type, core.PENDING, sqliteTS(time.Now()), sqliteTS(executor.LastHeardFromTime), 0.0, 0.0, "", "", string(hardwareJSONBytes), string(softwareJSONBytes), string(allocationsJSONBytes), executor.BlueprintID, executor.BlueprintGen, executor.LocationName, executor.ColonyName, executor.ColonyName+":"+executor.Name)
+			return err
+		}
+		return dberr.AlreadyExists("Executor with name <" + executor.Name + "> already exists in Colony with name <" + executor.ColonyName + ">")
+	}
+
+	allocationsJSONBytes, err := json.Marshal(executor.Allocations)
+	if err != nil {
+		return err
+	}
+
+	hardwareJSONBytes, err := json.Marshal(executor.Capabilities.Hardware)
+	if err != nil {
+		return err
+	}
+
+	softwareJSONBytes, err := json.Marshal(executor.Capabilities.Software)
+	if err != nil {
+		return err
+	}
+
+	sqlStatement := `INSERT INTO  ` + db.dbPrefix + `EXECUTORS (NAME, EXECUTOR_TYPE, EXECUTOR_ID, COLONY_NAME, STATE, REQUIRE_FUNC_REG, COMMISSIONTIME, LASTHEARDFROM, LONG, LAT, LOCNAME, LOCDESC, HARDWARE, SOFTWARE, ALLOCATIONS, BLUEPRINT_ID, BLUEPRINT_GEN, LOCATION_NAME) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`
+	_, err = db.postgresql.Exec(sqlStatement, executor.ColonyName+":"+executor.Name, executor.Type, executor.ID, executor.ColonyName, 0, executor.RequireFuncReg, sqliteTS(time.Now()), sqliteTS(executor.LastHeardFromTime), 0.0, 0.0, "", "", string(hardwareJSONBytes), string(softwareJSONBytes), string(allocationsJSONBytes), executor.BlueprintID, executor.BlueprintGen, executor.LocationName)
+
+	if err != nil {
+		// TODO(phase 3+): classify via sqlite error codes instead of message text.
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return dberr.AlreadyExists("Executor not unique, both Name and ExecutorId must be unique within a Colony")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (db *SQLiteDatabase) SetAllocations(colonyName string, executorName string, allocations core.Allocations) error {
+	executor, err := db.GetExecutorByName(colonyName, executorName)
+	if err != nil {
+		return err
+	}
+
+	if executor == nil {
+		return dberr.NotFound("Executor with name <" + executorName + "> does not exists in Colony with name <" + colonyName + ">")
+	}
+
+	allocationsJSONBytes, err := json.Marshal(allocations)
+	if err != nil {
+		return err
+	}
+
+	sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET ALLOCATIONS=$1 WHERE COLONY_NAME=$2 AND NAME=$3`
+	_, err = db.postgresql.Exec(sqlStatement, allocationsJSONBytes, colonyName, colonyName+":"+executorName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *SQLiteDatabase) parseExecutors(rows *sql.Rows) ([]*core.Executor, error) {
+	var executors []*core.Executor
+
+	for rows.Next() {
+		var name string
+		var executorType string
+		var id string
+		var colonyName string
+		var state int
+		var requireRunReg bool
+		var commissionTime time.Time
+		var lastHeardFromTime time.Time
+		var long float64
+		var lat float64
+		var locName sql.NullString
+		var desc sql.NullString
+		var hardwareJSONStr sql.NullString
+		var softwareJSONStr sql.NullString
+		var allocationsJSONStr string
+		var nodeID sql.NullString
+		var blueprintID sql.NullString
+		var blueprintGen sql.NullInt64
+		var locationName sql.NullString
+
+		if err := rows.Scan(&name, &executorType, &id, &colonyName, &state, &requireRunReg, &commissionTime, &lastHeardFromTime, &long, &lat, &locName, &desc, &hardwareJSONStr, &softwareJSONStr, &allocationsJSONStr, &nodeID, &blueprintID, &blueprintGen, &locationName); err != nil {
+			return nil, err
+		}
+		_ = nodeID // Intentionally unused - kept for database schema compatibility
+
+		s := strings.Split(name, ":")
+		if len(s) != 2 {
+			return nil, errors.New("Failed to parse Executor name")
+		}
+		name = s[1]
+
+		allocations := core.Allocations{}
+		err := json.Unmarshal([]byte(allocationsJSONStr), &allocations)
+		if err != nil {
+			return nil, err
+		}
+
+		executor := core.CreateExecutorFromDB(id, executorType, name, colonyName, state, requireRunReg, commissionTime, lastHeardFromTime)
+		// Note: long, lat, locName, desc are read from DB for backward compatibility but no longer used
+		_ = long
+		_ = lat
+		_ = locName
+		_ = desc
+
+		// Parse hardware array from JSON
+		var hardware []core.Hardware
+		if hardwareJSONStr.Valid && hardwareJSONStr.String != "" {
+			json.Unmarshal([]byte(hardwareJSONStr.String), &hardware)
+		}
+
+		// Parse software array from JSON
+		var software []core.Software
+		if softwareJSONStr.Valid && softwareJSONStr.String != "" {
+			json.Unmarshal([]byte(softwareJSONStr.String), &software)
+		}
+
+		capabilities := core.Capabilities{Hardware: hardware, Software: software}
+		executor.Capabilities = capabilities
+		executor.Allocations = allocations
+		if blueprintID.Valid {
+			executor.BlueprintID = blueprintID.String
+		}
+		if blueprintGen.Valid {
+			executor.BlueprintGen = blueprintGen.Int64
+		}
+		if locationName.Valid {
+			executor.LocationName = locationName.String
+		}
+
+		executors = append(executors, executor)
+	}
+
+	return executors, nil
+}
+
+func (db *SQLiteDatabase) GetExecutors() ([]*core.Executor, error) {
+	// Only return registered executors (exclude unregistered for traceability)
+	sqlStatement := `SELECT * FROM ` + db.dbPrefix + `EXECUTORS WHERE STATE!=$1`
+	rows, err := db.postgresql.Query(sqlStatement, core.UNREGISTERED)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	return db.parseExecutors(rows)
+}
+
+func (db *SQLiteDatabase) GetExecutorByID(executorID string) (*core.Executor, error) {
+	sqlStatement := `SELECT * FROM ` + db.dbPrefix + `EXECUTORS WHERE EXECUTOR_ID=$1`
+	rows, err := db.postgresql.Query(sqlStatement, executorID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	executors, err := db.parseExecutors(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(executors) == 0 {
+		return nil, nil
+	}
+
+	return executors[0], nil
+}
+
+func (db *SQLiteDatabase) GetExecutorsByColonyName(colonyName string) ([]*core.Executor, error) {
+	// Return all executors (filtering happens in CLI layer)
+	sqlStatement := `SELECT * FROM ` + db.dbPrefix + `EXECUTORS WHERE COLONY_NAME=$1`
+	rows, err := db.postgresql.Query(sqlStatement, colonyName)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	executors, err := db.parseExecutors(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	return executors, nil
+}
+
+func (db *SQLiteDatabase) GetExecutorByName(colonyName string, executorName string) (*core.Executor, error) {
+	sqlStatement := `SELECT * FROM ` + db.dbPrefix + `EXECUTORS WHERE COLONY_NAME=$1 AND NAME=$2`
+	rows, err := db.postgresql.Query(sqlStatement, colonyName, colonyName+":"+executorName)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	executors, err := db.parseExecutors(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(executors) == 0 {
+		return nil, nil
+	}
+
+	return executors[0], nil
+}
+
+func (db *SQLiteDatabase) GetExecutorsByBlueprintID(blueprintID string) ([]*core.Executor, error) {
+	sqlStatement := `SELECT * FROM ` + db.dbPrefix + `EXECUTORS WHERE BLUEPRINT_ID=$1`
+	rows, err := db.postgresql.Query(sqlStatement, blueprintID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	executors, err := db.parseExecutors(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	return executors, nil
+}
+
+func (db *SQLiteDatabase) ApproveExecutor(executor *core.Executor) error {
+	sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET STATE=1 WHERE EXECUTOR_ID=$1`
+	_, err := db.postgresql.Exec(sqlStatement, executor.ID)
+	if err != nil {
+		return err
+	}
+
+	executor.Approve()
+
+	return nil
+}
+
+func (db *SQLiteDatabase) RejectExecutor(executor *core.Executor) error {
+	sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET STATE=2 WHERE EXECUTOR_ID=$1`
+	_, err := db.postgresql.Exec(sqlStatement, executor.ID)
+	if err != nil {
+		return err
+	}
+
+	executor.Reject()
+
+	return nil
+}
+
+func (db *SQLiteDatabase) MarkAlive(executor *core.Executor) error {
+	sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET LASTHEARDFROM=$1 WHERE EXECUTOR_ID=$2`
+	_, err := db.postgresql.Exec(sqlStatement, sqliteTS(time.Now()), executor.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *SQLiteDatabase) ChangeExecutorID(colonyName string, oldExecutorID, newExecutorID string) error {
+	sqlStatement := `UPDATE  ` + db.dbPrefix + `EXECUTORS SET EXECUTOR_ID=$1 WHERE COLONY_NAME=$2 AND EXECUTOR_ID=$3`
+	_, err := db.postgresql.Exec(sqlStatement, newExecutorID, colonyName, oldExecutorID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *SQLiteDatabase) RemoveExecutorByName(colonyName string, executorName string) error {
+	executor, err := db.GetExecutorByName(colonyName, executorName)
+	if err != nil {
+		return err
+	}
+
+	if executor == nil {
+		return dberr.NotFound("Executor <" + executorName + "> does not exists")
+	}
+
+	// Mark executor as unregistered instead of deleting it (for traceability)
+	sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET STATE=$1 WHERE COLONY_NAME=$2 AND NAME=$3`
+	_, err = db.postgresql.Exec(sqlStatement, core.UNREGISTERED, colonyName, colonyName+":"+executorName)
+	if err != nil {
+		return err
+	}
+
+	// Move back the executor currently running process back to the queue
+	sqlStatement = `UPDATE ` + db.dbPrefix + `PROCESSES SET IS_ASSIGNED=FALSE, START_TIME=$1, END_TIME=$2, ASSIGNED_EXECUTOR_ID=$3, STATE=$4 WHERE ASSIGNED_EXECUTOR_ID=$5 AND STATE=$6`
+	_, err = db.postgresql.Exec(sqlStatement, sqliteTS(time.Time{}), sqliteTS(time.Time{}), "", core.WAITING, executor.ID, core.RUNNING)
+	if err != nil {
+		return err
+	}
+
+	err = db.RemoveFunctionsByExecutorName(executor.ColonyName, executor.Name)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *SQLiteDatabase) RemoveExecutorsByColonyName(colonyName string) error {
+	// When called during colony removal, we permanently delete executors (not just unregister)
+	// Move back any currently running processes back to the queue first
+	sqlStatement := `UPDATE ` + db.dbPrefix + `PROCESSES SET IS_ASSIGNED=FALSE, START_TIME=$1, END_TIME=$2, ASSIGNED_EXECUTOR_ID=$3, STATE=$4 WHERE TARGET_COLONY_NAME=$5 AND STATE=$6`
+	_, err := db.postgresql.Exec(sqlStatement, sqliteTS(time.Time{}), sqliteTS(time.Time{}), "", core.WAITING, colonyName, core.RUNNING)
+	if err != nil {
+		return err
+	}
+
+	// Permanently delete all executors in this colony
+	sqlStatement = `DELETE FROM ` + db.dbPrefix + `EXECUTORS WHERE COLONY_NAME=$1`
+	_, err = db.postgresql.Exec(sqlStatement, colonyName)
+	if err != nil {
+		return err
+	}
+
+	err = db.RemoveFunctionsByColonyName(colonyName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *SQLiteDatabase) CountExecutors() (int, error) {
+	executors, err := db.GetExecutors()
+	if err != nil {
+		return -1, err
+	}
+
+	return len(executors), nil
+}
+
+func (db *SQLiteDatabase) CountExecutorsByColonyName(colonyName string) (int, error) {
+	executors, err := db.GetExecutorsByColonyName(colonyName)
+	if err != nil {
+		return -1, err
+	}
+
+	return len(executors), nil
+}
+
+func (db *SQLiteDatabase) CountExecutorsByColonyNameAndState(colonyName string, state int) (int, error) {
+	sqlStatement := `SELECT COUNT(*) FROM ` + db.dbPrefix + `EXECUTORS WHERE COLONY_NAME=$1 AND STATE=$2`
+	var count int
+	err := db.postgresql.QueryRow(sqlStatement, colonyName, state).Scan(&count)
+	if err != nil {
+		return -1, err
+	}
+
+	return count, nil
+}
+
+func (db *SQLiteDatabase) UpdateExecutorCapabilities(colonyName string, executorName string, capabilities core.Capabilities) error {
+	executor, err := db.GetExecutorByName(colonyName, executorName)
+	if err != nil {
+		return err
+	}
+
+	if executor == nil {
+		return dberr.NotFound("Executor with name <" + executorName + "> does not exist in Colony with name <" + colonyName + ">")
+	}
+
+	hardwareJSONBytes, err := json.Marshal(capabilities.Hardware)
+	if err != nil {
+		return err
+	}
+
+	softwareJSONBytes, err := json.Marshal(capabilities.Software)
+	if err != nil {
+		return err
+	}
+
+	sqlStatement := `UPDATE ` + db.dbPrefix + `EXECUTORS SET HARDWARE=$1, SOFTWARE=$2 WHERE COLONY_NAME=$3 AND NAME=$4`
+	_, err = db.postgresql.Exec(sqlStatement, string(hardwareJSONBytes), string(softwareJSONBytes), colonyName, colonyName+":"+executorName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
