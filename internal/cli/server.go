@@ -27,7 +27,8 @@ func init() {
 	chServerIDCmd.Flags().StringVarP(&TargetServerID, "serverid", "", "", "Server Id")
 	chServerIDCmd.MarkFlagRequired("serverid")
 
-	serverCmd.PersistentFlags().StringVarP(&DBType, "dbtype", "", "postgresql", "Database type (postgresql or velocitydb)")
+	serverCmd.PersistentFlags().StringVarP(&DBType, "dbtype", "", "postgresql", "Database type")
+	serverCmd.PersistentFlags().BoolVarP(&ClusterEnabled, "cluster", "", true, "Enable etcd-based clustering (disable for single-node deployments, can also use COLONIES_CLUSTER)")
 	serverCmd.PersistentFlags().StringVarP(&DBHost, "dbhost", "", "", "Colonies database host")
 	serverCmd.PersistentFlags().IntVarP(&DBPort, "dbport", "", DefaultDBPort, "Colonies database port")
 	serverCmd.PersistentFlags().StringVarP(&DBUser, "dbuser", "", "", "Colonies database user")
@@ -57,6 +58,7 @@ func startServer(
 	db database.Database,
 	node cluster.Node,
 	clusterConfig cluster.Config,
+	clusterEnabled bool,
 	etcdDataPath string,
 ) {
 	retentionPeriod := 60000 // Run retention worker once a minute
@@ -72,6 +74,7 @@ func startServer(
 		TLSCert,
 		node,
 		clusterConfig,
+		clusterEnabled,
 		etcdDataPath,
 		GeneratorCheckerPeriod,
 		CronCheckerPeriod,
@@ -140,6 +143,21 @@ var serverStartCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		parseDBEnv()
 		parseEnv()
+
+		// Clustering can be disabled with COLONIES_CLUSTER for single-node
+		// deployments; the --cluster flag takes precedence when set explicitly.
+		if clusterStr := os.Getenv("COLONIES_CLUSTER"); clusterStr != "" {
+			ClusterEnabled = clusterStr == "true"
+			log.WithField("ClusterEnabled", ClusterEnabled).Info("Using COLONIES_CLUSTER from environment")
+		}
+
+		if !ClusterEnabled && len(EtcdCluster) > 0 {
+			CheckError(errors.New("--initial-cluster cannot be combined with clustering disabled (--cluster=false / COLONIES_CLUSTER=false)"))
+		}
+
+		log.WithFields(log.Fields{
+			"ClusterEnabled": ClusterEnabled,
+		}).Info("Cluster configuration check")
 
 		// Read HTTP server configuration from environment if not set via flags
 		if ServerPort == -1 {
@@ -305,7 +323,7 @@ var serverStartCmd = &cobra.Command{
 		}
 
 		log.Info("Starting HTTP server")
-		startServer(db, node, clusterConfig, EtcdDataDir)
+		startServer(db, node, clusterConfig, ClusterEnabled, EtcdDataDir)
 	},
 }
 
