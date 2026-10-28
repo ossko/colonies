@@ -107,9 +107,7 @@ func (s *stmt) exec(ctx context.Context, args []driver.NamedValue) (r driver.Res
 	}
 
 	defer func() {
-		// done: the watcher goroutine saw the context end; canceled: so did
-		// busyHandler, ending a wait for a lock, perhaps before the watcher ran
-		if ctx != nil && ctx.Done() != nil && (atomic.LoadInt32(&done) != 0 || s.c.canceled.Load() != 0) {
+		if ctx != nil && atomic.LoadInt32(&done) != 0 {
 			r, err = nil, ctx.Err()
 		}
 		if pstmt != 0 {
@@ -299,9 +297,7 @@ func (s *stmt) query(ctx context.Context, args []driver.NamedValue) (r driver.Ro
 	}
 
 	defer func() {
-		// done: the watcher goroutine saw the context end; canceled: so did
-		// busyHandler, ending a wait for a lock, perhaps before the watcher ran
-		if ctx != nil && ctx.Done() != nil && (atomic.LoadInt32(&done) != 0 || s.c.canceled.Load() != 0) {
+		if ctx != nil && atomic.LoadInt32(&done) != 0 {
 			if r != nil {
 				r.Close()
 			}

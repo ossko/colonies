@@ -24,7 +24,7 @@ require (
 	go.etcd.io/etcd/server/v3 v3.5.12
 	golang.org/x/crypto v0.42.0
 	golang.org/x/term v0.35.0
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.58.0
 )
 
 require (
