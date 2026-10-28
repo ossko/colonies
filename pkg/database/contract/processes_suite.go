@@ -1,4 +1,4 @@
-package postgresql
+package contract
 
 import (
 	"math"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +20,7 @@ func (c byLowestPriorityTime) Less(i, j int) bool { return c[i].PriorityTime < c
 func (c byLowestPriorityTime) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 
 // schedulerSelect replicates scheduler.Select logic for testing
-func schedulerSelect(db *PQDatabase, colonyName string, executor *core.Executor, cpu, memory int64) (*core.Process, error) {
+func schedulerSelect(db database.Database, colonyName string, executor *core.Executor, cpu, memory int64) (*core.Process, error) {
 	storage := int64(0)
 	nodes := math.MaxInt8
 	processes := math.MaxInt8
@@ -291,27 +292,6 @@ func TestAddProcessConditions(t *testing.T) {
 	assert.Equal(t, processFromDB.FunctionSpec.Conditions.GPU.Name, "nvidia_2080ti")
 	assert.Equal(t, processFromDB.FunctionSpec.Conditions.GPU.Count, 4)
 	assert.Equal(t, processFromDB.FunctionSpec.Conditions.GPU.Memory, "9536Mi")
-}
-
-func TestSelectCandiate(t *testing.T) {
-	db, err := PrepareTests()
-	assert.Nil(t, err)
-
-	defer db.Close()
-
-	var processes []*core.Process
-
-	selectedProcess := db.selectCandidate(processes)
-	assert.Nil(t, selectedProcess)
-
-	process1 := utils.CreateTestProcess(core.GenerateRandomID())
-	process2 := utils.CreateTestProcess(core.GenerateRandomID())
-	processes = append(processes, process1)
-	processes = append(processes, process2)
-
-	selectedProcess = db.selectCandidate(processes)
-	assert.NotNil(t, selectedProcess)
-	assert.Equal(t, selectedProcess.ID, process1.ID)
 }
 
 func TestAddProcessWithEnv(t *testing.T) {
@@ -662,78 +642,6 @@ func TestRemoveAllProcessesInProcessGraphsByColonyName(t *testing.T) {
 	assert.NotNil(t, processFromServer)
 }
 
-func TestRemoveAllProcessesInProcessGraphsByColonyNameWithState(t *testing.T) {
-	db, err := PrepareTests()
-	assert.Nil(t, err)
-
-	defer db.Close()
-
-	colonyName := core.GenerateRandomID()
-	processGraphID1 := core.GenerateRandomID()
-	processGraphID2 := core.GenerateRandomID()
-	processGraphID3 := core.GenerateRandomID()
-	process1 := utils.CreateTestProcess(colonyName)
-	process1.ProcessGraphID = processGraphID1
-	err = db.AddProcess(process1)
-	assert.Nil(t, err)
-	attribute1 := core.CreateAttribute(process1.ID, colonyName, processGraphID1, core.IN, "test_key1", "test_value1")
-	err = db.AddAttribute(attribute1)
-	assert.Nil(t, err)
-
-	process2 := utils.CreateTestProcess(colonyName)
-	process2.ProcessGraphID = processGraphID2
-	err = db.AddProcess(process2)
-	assert.Nil(t, err)
-	attribute2 := core.CreateAttribute(process2.ID, colonyName, processGraphID2, core.IN, "test_key1", "test_value1")
-	err = db.AddAttribute(attribute2)
-	assert.Nil(t, err)
-
-	process3 := utils.CreateTestProcess(colonyName)
-	process3.ProcessGraphID = processGraphID3
-	err = db.AddProcess(process3)
-	assert.Nil(t, err)
-	attribute3 := core.CreateAttribute(process3.ID, colonyName, processGraphID3, core.IN, "test_key1", "test_value1")
-	err = db.AddAttribute(attribute3)
-	assert.Nil(t, err)
-
-	process4 := utils.CreateTestProcess(colonyName)
-	err = db.AddProcess(process4)
-	assert.Nil(t, err)
-	attribute4 := core.CreateAttribute(process4.ID, colonyName, "", core.IN, "test_key1", "test_value1")
-	err = db.AddAttribute(attribute4)
-	assert.Nil(t, err)
-
-	err = db.SetProcessState(process1.ID, core.FAILED)
-	assert.Nil(t, err)
-
-	err = db.SetProcessState(process2.ID, core.FAILED)
-	assert.Nil(t, err)
-
-	err = db.SetProcessState(process3.ID, core.RUNNING)
-	assert.Nil(t, err)
-
-	err = db.SetProcessState(process4.ID, core.RUNNING)
-	assert.Nil(t, err)
-
-	runningProcesses, err := db.CountFailedProcesses()
-	assert.Nil(t, err)
-	assert.Equal(t, runningProcesses, 2)
-
-	err = db.RemoveAllProcessesInProcessGraphsByColonyNameWithState(colonyName, core.FAILED)
-	assert.Nil(t, err)
-
-	runningProcesses, err = db.CountFailedProcesses()
-	assert.Nil(t, err)
-	assert.Equal(t, runningProcesses, 0)
-
-	err = db.RemoveAllProcessesInProcessGraphsByColonyNameWithState(colonyName, core.RUNNING)
-	assert.Nil(t, err)
-
-	runningProcesses, err = db.CountRunningProcesses()
-	assert.Nil(t, err)
-	assert.Equal(t, runningProcesses, 1)
-}
-
 func TestRemoveAllProcessesAndAttributes(t *testing.T) {
 	db, err := PrepareTests()
 	assert.Nil(t, err)
@@ -1068,26 +976,6 @@ func TestSetProcessState(t *testing.T) {
 	assert.Equal(t, process2.State, core.FAILED)
 }
 
-func TestSetWaitDeadline(t *testing.T) {
-	db, err := PrepareTests()
-	assert.Nil(t, err)
-
-	defer db.Close()
-
-	colony := core.CreateColony(core.GenerateRandomID(), "test_colony_name")
-	process := utils.CreateTestProcess(colony.Name)
-	err = db.AddProcess(process)
-	assert.Nil(t, err)
-	assert.Equal(t, process.ExecDeadline, time.Time{})
-
-	err = db.SetWaitDeadline(process, time.Now())
-	assert.Nil(t, err)
-
-	processFromDB, err := db.GetProcessByID(process.ID)
-	assert.Nil(t, err)
-	assert.NotEqual(t, processFromDB.WaitDeadline, time.Time{})
-}
-
 func TestSetInput(t *testing.T) {
 	db, err := PrepareTests()
 	assert.Nil(t, err)
@@ -1159,26 +1047,6 @@ func TestSetOutput(t *testing.T) {
 	assert.Len(t, processFromDB.Output, 2)
 	assert.Equal(t, processFromDB.Output[0], "result1")
 	assert.Equal(t, processFromDB.Output[1], "result2")
-}
-
-func TestSetExecDeadline(t *testing.T) {
-	db, err := PrepareTests()
-	assert.Nil(t, err)
-
-	defer db.Close()
-
-	colony := core.CreateColony(core.GenerateRandomID(), "test_colony_name")
-	process := utils.CreateTestProcess(colony.Name)
-	err = db.AddProcess(process)
-	assert.Nil(t, err)
-	assert.Equal(t, process.ExecDeadline, time.Time{})
-
-	err = db.SetExecDeadline(process, time.Now())
-	assert.Nil(t, err)
-
-	processFromDB, err := db.GetProcessByID(process.ID)
-	assert.Nil(t, err)
-	assert.NotEqual(t, processFromDB.ExecDeadline, time.Time{})
 }
 
 func TestSetErrorMsg(t *testing.T) {
@@ -2469,9 +2337,9 @@ func TestSelectAndAssign(t *testing.T) {
 		executor.Name,
 		executor.Type,
 		executor.LocationName,
-		0, 0, 0,  // cpu, memory, storage
-		0, 0, 0,  // nodes, processes, processesPerNode
-		1,        // count
+		0, 0, 0, // cpu, memory, storage
+		0, 0, 0, // nodes, processes, processesPerNode
+		1, // count
 	)
 	assert.Nil(t, err)
 	assert.NotNil(t, assignedProcess)

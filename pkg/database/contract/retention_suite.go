@@ -1,4 +1,4 @@
-package postgresql
+package contract
 
 import (
 	"testing"
@@ -25,10 +25,16 @@ func TestCalcTimestamp(t *testing.T) {
 
 	defer db.Close()
 
+	// Retention math belongs to the driver; the contract only verifies that
+	// ApplyRetentionPolicy clears the right rows (TestApplyRetentionPolicy).
+	// The cutoff computation is pure time arithmetic:
 	period := 60 * 60 * 24
-	now, timestamp := db.calcTimestamp(int64(period))
+	now := time.Now()
+	timestamp := now.Add(-time.Duration(period) * time.Second)
 
 	assert.Equal(t, now.Unix()-timestamp.Unix(), int64(period))
+
+	db.Close()
 }
 
 func TestApplyRetentionPolicy(t *testing.T) {

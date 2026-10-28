@@ -1,4 +1,4 @@
-package postgresql
+package contract
 
 import (
 	"testing"
@@ -246,7 +246,7 @@ func TestUpdateAttribute(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestSetAttributeState(t *testing.T) {
+func TestAttributeStateFollowsProcessLifecycle(t *testing.T) {
 	db, err := PrepareTests()
 	assert.Nil(t, err)
 
@@ -280,20 +280,32 @@ func TestSetAttributeState(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, attributeFromDB.State, 0)
 
-	err = db.SetAttributeState(process1ID, core.SUCCESS)
+	// Attribute states follow the process lifecycle (CONTRACT.md §6,
+	// process/attribute coupling): Assign moves the targeted attributes to
+	// RUNNING, MarkSuccessful to SUCCESS. Scope is by target id only.
+	process := utils.CreateTestProcess(colonyName)
+	process.ID = process1ID
+	err = db.AddProcess(process)
+	assert.Nil(t, err)
+
+	executorID := core.GenerateRandomID()
+	err = db.Assign(executorID, process)
+	assert.Nil(t, err)
+
+	_, _, err = db.MarkSuccessful(process1ID)
 	assert.Nil(t, err)
 
 	attributeFromDB, err = db.GetAttributeByID(attribute1.ID)
 	assert.Nil(t, err)
-	assert.Equal(t, attributeFromDB.State, 2)
+	assert.Equal(t, core.SUCCESS, attributeFromDB.State)
 
 	attributeFromDB, err = db.GetAttributeByID(attribute2.ID)
 	assert.Nil(t, err)
-	assert.Equal(t, attributeFromDB.State, 2)
+	assert.Equal(t, core.SUCCESS, attributeFromDB.State)
 
 	attributeFromDB, err = db.GetAttributeByID(attribute3.ID)
 	assert.Nil(t, err)
-	assert.Equal(t, attributeFromDB.State, 0)
+	assert.Equal(t, 0, attributeFromDB.State)
 }
 
 func TestRemoveAttributes(t *testing.T) {

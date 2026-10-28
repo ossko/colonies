@@ -1,4 +1,4 @@
-package postgresql
+package contract
 
 import (
 	"testing"
@@ -110,62 +110,9 @@ func TestRemoveLogsByColonyName(t *testing.T) {
 	assert.Len(t, logs, 1)
 }
 
-func TestSearchLogs(t *testing.T) {
-	db, err := PrepareTests()
-	assert.Nil(t, err)
-
-	defer db.Close()
-
-	timestamp := time.Now().UTC()
-	err = db.addHistoricalLog("test_processid1", "test_colony", "test_executor_name1", timestamp.UnixNano(), "1", timestamp)
-	assert.Nil(t, err)
-	timestamp = time.Now().UTC()
-	err = db.addHistoricalLog("test_processid2", "test_colony", "test_executor_name1", timestamp.UnixNano(), "test", timestamp)
-	assert.Nil(t, err)
-	timestamp = time.Now().UTC()
-	err = db.addHistoricalLog("test_processid2", "test_colony", "test_executor_name1", timestamp.UnixNano(), "test", timestamp)
-	assert.Nil(t, err)
-	timestamp = time.Now().Add(-24*time.Hour*3 - time.Hour).UTC()
-	err = db.addHistoricalLog("test_processid3", "test_colony", "test_executor_name2", timestamp.UnixNano(), "error", timestamp)
-	assert.Nil(t, err)
-
-	logs, err := db.SearchLogs("test_colony", "", -1, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 0)
-
-	logs, err = db.SearchLogs("test_colony", "error", -1, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 0)
-
-	logs, err = db.SearchLogs("test_colony", "error", 0, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 0)
-
-	logs, err = db.SearchLogs("test_colony", "error", 1, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 0)
-
-	logs, err = db.SearchLogs("test_colony", "error", 2, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 0)
-
-	logs, err = db.SearchLogs("test_colony", "error", 3, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 0)
-
-	logs, err = db.SearchLogs("test_colony", "error", 4, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 1)
-	for _, log := range logs {
-		assert.Equal(t, log.ProcessID, "test_processid3")
-		assert.Equal(t, log.Message, "error")
-	}
-
-	logs, err = db.SearchLogs("test_colony", "test", 3, 10)
-	assert.Nil(t, err)
-	assert.Len(t, logs, 2)
-	for _, log := range logs {
-		assert.Equal(t, log.Message, "test")
-		assert.Equal(t, log.ExecutorName, "test_executor_name1")
-	}
-}
+// TestSearchLogs is intentionally NOT part of the conformance suite: it
+// asserts the retention-window semantics of SearchLogs over the ingestion
+// time (ADDED). The interface has no way to backdate ingestion (AddLog
+// always stamps the current time), so the test lives with the driver, which
+// may control ingestion time through driver-internal means: see
+// pkg/database/postgresql/driverinternal_test.go (TestSearchLogsOverIngestionTime).

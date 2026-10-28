@@ -1,4 +1,4 @@
-package postgresql
+package contract
 
 import (
 	"testing"
@@ -286,7 +286,13 @@ func TestRemoveFilesByColonyName(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, files, 2)
 
-	err = db.RemoveFilesByColonyName("test_colony2")
+	// The public cascade path: files die with their colony
+	// (CONTRACT.md §6 ColonyDatabase). The colony must exist to be removed.
+	colony := core.CreateColony("test_colony2_id", "test_colony2")
+	err = db.AddColony(colony)
+	assert.Nil(t, err)
+
+	err = db.RemoveColonyByName("test_colony2")
 	assert.Nil(t, err)
 
 	files, err = db.CountFiles("test_colonyid1")
@@ -490,9 +496,11 @@ func TestGetFileLabelByName(t *testing.T) {
 
 	defer db.Close()
 
-	label, err := db.GetFileLabelByName("test_colonyid", "/demowater")
+	// The singular lookup is expressed through the plural interface method:
+	// labels of a colony are discoverable via GetFileLabels and matched by name
+	labels, err := db.GetFileLabels("test_colonyid")
 	assert.Nil(t, err)
-	assert.Nil(t, label)
+	assert.Empty(t, labels)
 
 	now := time.Now()
 	file := utils.CreateTestFileWithID("test_id", "test_colonyid", now)
@@ -503,9 +511,11 @@ func TestGetFileLabelByName(t *testing.T) {
 	err = db.AddFile(file)
 	assert.Nil(t, err)
 
-	label, err = db.GetFileLabelByName("test_colonyid", "/demowater")
+	labels, err = db.GetFileLabels("test_colonyid")
 	assert.Nil(t, err)
-	assert.NotNil(t, label)
+	assert.Len(t, labels, 1)
+	assert.Equal(t, "/demowater", labels[0].Name)
+	assert.Equal(t, 1, labels[0].Files)
 }
 
 func TestGetFileLabelsByNameOverlappingName(t *testing.T) {

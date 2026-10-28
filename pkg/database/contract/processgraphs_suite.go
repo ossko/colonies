@@ -1,14 +1,15 @@
-package postgresql
+package contract
 
 import (
 	"testing"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
 
-func generateProcessGraph(t *testing.T, db *PQDatabase, colonyName string) *core.ProcessGraph {
+func generateProcessGraph(t *testing.T, db database.Database, colonyName string) *core.ProcessGraph {
 	process1 := utils.CreateTestProcess(colonyName)
 	process2 := utils.CreateTestProcess(colonyName)
 	process3 := utils.CreateTestProcess(colonyName)
@@ -46,7 +47,7 @@ func generateProcessGraph(t *testing.T, db *PQDatabase, colonyName string) *core
 	return graph
 }
 
-func generateProcessGraph2(t *testing.T, db *PQDatabase, colonyName string) (*core.Process, *core.ProcessGraph) {
+func generateProcessGraph2(t *testing.T, db database.Database, colonyName string) (*core.Process, *core.ProcessGraph) {
 	graph, err := core.CreateProcessGraph(colonyName)
 	assert.Nil(t, err)
 

@@ -3,8 +3,11 @@
 This document defines the semantics every `database.Database` driver implementation
 must honor. The interface in this package is the contract; this document is its
 normative companion. Drivers live in their own packages (e.g. `pkg/database/postgresql`)
-and must pass the shared behavioral test suite (see `pkg/database/contract`, planned
-as part of the database-driver-abstraction work) before being registered in the factory.
+and must pass the shared behavioral test suite (`pkg/database/contract`) before being
+registered in the factory: drivers activate it from a test file with
+`contract.RegisterConformanceFactory(...)` plus a
+`func TestConformance(t *testing.T) { contract.RunSuite(t) }` runner, e.g.
+`pkg/database/postgresql/conformance_test.go`.
 
 Drivers may be backed by SQL or non-SQL engines. The contract deliberately describes
 *behavior*, not storage.
@@ -72,11 +75,20 @@ The repository uses a nil-result convention that drivers must preserve:
   `SetAllocations`, `RemoveColonyByName`, snapshot getters, ...) return
   `ErrNotFound` when the target is missing.
 - **`Find*`/list methods return an empty (possibly nil) slice**, no error.
-- **`Remove*` methods are idempotent** whenever the underlying engine allows;
-  the postgres driver documents method-specific behavior (some remove methods
-  perform existence checks and return `ErrNotFound`, others delete silently).
-  New drivers must match the postgres driver's per-method behavior; the
-  conformance suite is the reference.
+- `Remove*` methods: the postgres driver splits into two families, and new
+  drivers must do the same (conformance suite asserts both):
+  - *existence-checking* — return `ErrNotFound` when the target is missing
+    (e.g. `RemoveColonyByName`, `MarkFailed`);
+  - *idempotent* — return `nil` regardless of prior existence
+    (e.g. `RemoveCronByID`).
+- **State transitions of `MarkSuccessful` are idempotent on terminal
+  processes** (calling it on a `SUCCESS` process is a no-op returning their
+  times), while `MarkFailed` refuses terminal transitions with `ErrConflict`.
+- `SearchLogs` filters over the **ingestion time** of the row, not over the
+  log's own `timestamp` field. Since `AddLog` always stamps ingestion time as
+  now, the days-window semantics cannot be exercised through the interface;
+  each driver covers this in its own internal tests
+  (e.g. `TestSearchLogsOverIngestionTime`).
 - **`Count*` methods return 0**, no error, on empty results.
 
 ## 5. Identity, naming and uniqueness
