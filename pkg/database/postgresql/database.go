@@ -119,6 +119,15 @@ func (db *PQDatabase) Close() {
 	db.postgresql.Close()
 }
 
+// Healthy reports whether the PostgreSQL server is reachable. It is safe to
+// call at any time after Connect and is intended for periodic health checks.
+func (db *PQDatabase) Healthy() bool {
+	if db.postgresql == nil {
+		return false
+	}
+	return db.postgresql.Ping() == nil
+}
+
 func (db *PQDatabase) dropUsersTable() error {
 	sqlStatement := `DROP TABLE ` + db.dbPrefix + `USERS`
 	_, err := db.postgresql.Exec(sqlStatement)

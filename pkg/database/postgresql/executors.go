@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	_ "github.com/lib/pq"
 )
 
@@ -46,7 +47,7 @@ func (db *PQDatabase) AddExecutor(executor *core.Executor) error {
 			_, err = db.postgresql.Exec(sqlStatement, executor.ID, executor.Type, core.PENDING, time.Now(), executor.LastHeardFromTime, 0.0, 0.0, "", "", string(hardwareJSONBytes), string(softwareJSONBytes), string(allocationsJSONBytes), executor.BlueprintID, executor.BlueprintGen, executor.LocationName, executor.ColonyName, executor.ColonyName+":"+executor.Name)
 			return err
 		}
-		return errors.New("Executor with name <" + executor.Name + "> already exists in Colony with name <" + executor.ColonyName + ">")
+		return dberr.AlreadyExists("Executor with name <" + executor.Name + "> already exists in Colony with name <" + executor.ColonyName + ">")
 	}
 
 	allocationsJSONBytes, err := json.Marshal(executor.Allocations)
@@ -68,8 +69,10 @@ func (db *PQDatabase) AddExecutor(executor *core.Executor) error {
 	_, err = db.postgresql.Exec(sqlStatement, executor.ColonyName+":"+executor.Name, executor.Type, executor.ID, executor.ColonyName, 0, executor.RequireFuncReg, time.Now(), executor.LastHeardFromTime, 0.0, 0.0, "", "", string(hardwareJSONBytes), string(softwareJSONBytes), string(allocationsJSONBytes), executor.BlueprintID, executor.BlueprintGen, executor.LocationName)
 
 	if err != nil {
+		// TODO(phase 2): classify via lib/pq SQLSTATE 23505 (unique_violation)
+		// instead of matching the server's message text.
 		if strings.HasPrefix(err.Error(), "pq: duplicate key value violates unique constraint") {
-			return errors.New("Executor not unique, both Name and ExecutorId must be unique within a Colony")
+			return dberr.AlreadyExists("Executor not unique, both Name and ExecutorId must be unique within a Colony")
 		}
 		return err
 	}
@@ -84,7 +87,7 @@ func (db *PQDatabase) SetAllocations(colonyName string, executorName string, all
 	}
 
 	if executor == nil {
-		return errors.New("Executor with name <" + executorName + "> does not exists in Colony with name <" + colonyName + ">")
+		return dberr.NotFound("Executor with name <" + executorName + "> does not exists in Colony with name <" + colonyName + ">")
 	}
 
 	allocationsJSONBytes, err := json.Marshal(allocations)
@@ -321,7 +324,7 @@ func (db *PQDatabase) RemoveExecutorByName(colonyName string, executorName strin
 	}
 
 	if executor == nil {
-		return errors.New("Executor <" + executorName + "> does not exists")
+		return dberr.NotFound("Executor <" + executorName + "> does not exists")
 	}
 
 	// Mark executor as unregistered instead of deleting it (for traceability)
@@ -406,7 +409,7 @@ func (db *PQDatabase) UpdateExecutorCapabilities(colonyName string, executorName
 	}
 
 	if executor == nil {
-		return errors.New("Executor with name <" + executorName + "> does not exist in Colony with name <" + colonyName + ">")
+		return dberr.NotFound("Executor with name <" + executorName + "> does not exist in Colony with name <" + colonyName + ">")
 	}
 
 	hardwareJSONBytes, err := json.Marshal(capabilities.Hardware)

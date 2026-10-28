@@ -2,10 +2,10 @@ package postgresql
 
 import (
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 )
 
 func (db *PQDatabase) AddGenerator(generator *core.Generator) error {
@@ -15,7 +15,7 @@ func (db *PQDatabase) AddGenerator(generator *core.Generator) error {
 	}
 
 	if existingGenerator != nil {
-		return errors.New("Generator with name <" + generator.Name + "> in Colony <" + generator.ColonyName + "> already exists")
+		return dberr.AlreadyExists("Generator with name <" + generator.Name + "> in Colony <" + generator.ColonyName + "> already exists")
 	}
 
 	sqlStatement := `INSERT INTO  ` + db.dbPrefix + `GENERATORS (GENERATOR_ID, COLONY_NAME, NAME, WORKFLOW_SPEC, TRIGGER, TIMEOUT, LASTRUN, FIRSTPACK, INITIATOR_ID, INITIATOR_NAME) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
@@ -91,7 +91,7 @@ func (db *PQDatabase) GetGeneratorByName(colonyName string, name string) (*core.
 	}
 
 	if len(generators) > 1 {
-		return nil, errors.New("Expected one generator, generator name should be unique")
+		return nil, dberr.Conflict("Expected one generator, generator name should be unique")
 	}
 
 	if len(generators) == 0 {

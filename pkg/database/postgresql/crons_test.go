@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -239,7 +240,7 @@ func TestAddDuplicateCronRejected(t *testing.T) {
 	cron2.ID = core.GenerateRandomID()
 	err = db.AddCron(cron2)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "already exists")
+	assert.True(t, dberr.IsAlreadyExists(err), err.Error())
 
 	// Verify only one cron exists
 	crons, err := db.FindCronsByColonyName(colonyName, 100)
@@ -312,7 +313,7 @@ func TestAddCronConcurrentDuplicateRejected(t *testing.T) {
 			successCount++
 		} else {
 			failCount++
-			assert.Contains(t, err.Error(), "already exists")
+			assert.True(t, dberr.IsAlreadyExists(err), err.Error())
 		}
 	}
 

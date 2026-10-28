@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	_ "github.com/lib/pq"
 )
 
@@ -228,7 +229,7 @@ func (db *PQDatabase) AddBlueprint(blueprint *core.Blueprint) error {
 	}
 
 	if existingBlueprint != nil {
-		return errors.New("Blueprint with name <" + blueprint.Metadata.Name + "> in namespace <" + blueprint.Metadata.ColonyName + "> already exists")
+		return dberr.AlreadyExists("Blueprint with name <" + blueprint.Metadata.Name + "> in namespace <" + blueprint.Metadata.ColonyName + "> already exists")
 	}
 
 	blueprintJSON, err := blueprint.ToJSON()
@@ -427,7 +428,7 @@ func (db *PQDatabase) UpdateBlueprintStatus(id string, status map[string]interfa
 		return err
 	}
 	if rowsAffected == 0 {
-		return errors.New("Blueprint not found")
+		return dberr.NotFound("Blueprint not found")
 	}
 
 	return nil

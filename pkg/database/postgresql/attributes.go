@@ -2,11 +2,11 @@ package postgresql
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 )
 
 func (db *PQDatabase) AddAttributes(attributes []core.Attribute) error {
@@ -87,9 +87,9 @@ func (db *PQDatabase) GetAttributeByID(attributeID string) (core.Attribute, erro
 	}
 
 	if len(attributes) > 1 {
-		return core.Attribute{}, errors.New("Expected attributes to be unique")
+		return core.Attribute{}, dberr.Conflict("Expected attributes to be unique")
 	} else if len(attributes) == 0 {
-		return core.Attribute{}, errors.New("Attribute does not exists")
+		return core.Attribute{}, dberr.NotFound("Attribute does not exists")
 	}
 
 	return attributes[0], nil
@@ -126,9 +126,9 @@ func (db *PQDatabase) GetAttribute(targetID string, key string, attributeType in
 		return core.Attribute{}, err
 	}
 	if len(attributes) > 1 {
-		return core.Attribute{}, errors.New("Expected attributes to be unique")
+		return core.Attribute{}, dberr.Conflict("Expected attributes to be unique")
 	} else if len(attributes) == 0 {
-		return core.Attribute{}, errors.New("Attribute does not exists")
+		return core.Attribute{}, dberr.NotFound("Attribute does not exists")
 	}
 
 	return attributes[0], nil

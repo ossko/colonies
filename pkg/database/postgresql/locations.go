@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	_ "github.com/lib/pq"
 )
 
@@ -20,7 +21,7 @@ func (db *PQDatabase) AddLocation(location *core.Location) error {
 	}
 
 	if existingLocation != nil {
-		return errors.New("Location with name <" + location.Name + "> already exists in Colony with name <" + location.ColonyName + ">")
+		return dberr.AlreadyExists("Location with name <" + location.Name + "> already exists in Colony with name <" + location.ColonyName + ">")
 	}
 
 	sqlStatement := `INSERT INTO ` + db.dbPrefix + `LOCATIONS (NAME, LOCATION_ID, COLONY_NAME, DESCRIPTION, LONG, LAT) VALUES ($1, $2, $3, $4, $5, $6)`

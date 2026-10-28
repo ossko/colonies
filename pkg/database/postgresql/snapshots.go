@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
@@ -15,7 +16,7 @@ func (db *PQDatabase) CreateSnapshot(colonyName string, label string, name strin
 	existingSnapshot, _ := db.GetSnapshotByName(colonyName, name)
 
 	if existingSnapshot != nil {
-		return nil, errors.New("Snapshot with name <" + name + "> in Colony <" + colonyName + "> already exists")
+		return nil, dberr.AlreadyExists("Snapshot with name <" + name + "> in Colony <" + colonyName + "> already exists")
 	}
 
 	label = strings.TrimSuffix(label, "/")
@@ -103,7 +104,7 @@ func (db *PQDatabase) GetSnapshotByID(colonyName string, snapshotID string) (*co
 	if len(snapshots) == 1 {
 		return snapshots[0], nil
 	} else {
-		return nil, errors.New("Snapshot not found with Id <" + snapshotID + "> in Colony <" + colonyName + "> does not exists")
+		return nil, dberr.NotFound("Snapshot not found with Id <" + snapshotID + "> in Colony <" + colonyName + "> does not exists")
 	}
 }
 
@@ -124,7 +125,7 @@ func (db *PQDatabase) GetSnapshotByName(colonyName string, name string) (*core.S
 	if len(snapshots) == 1 {
 		return snapshots[0], nil
 	} else {
-		return nil, errors.New("Snapshot not found with name <" + name + "> in Colony <" + colonyName + "> does not exists")
+		return nil, dberr.NotFound("Snapshot not found with name <" + name + "> in Colony <" + colonyName + "> does not exists")
 	}
 }
 

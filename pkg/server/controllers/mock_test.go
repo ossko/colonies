@@ -600,6 +600,8 @@ func (db *DatabaseMock) GetBlueprintHistoryByGeneration(blueprintID string, gene
 func (db *DatabaseMock) RemoveBlueprintHistory(blueprintID string) error { return nil }
 
 // Implement the database.Database interface
+func (db *DatabaseMock) Connect() error                                   { return nil }
+func (db *DatabaseMock) Healthy() bool                                    { return true }
 func (db *DatabaseMock) CreateTables() error                              { return nil }
 func (db *DatabaseMock) DropTables() error                                { return nil }
 func (db *DatabaseMock) Close()                                           {}

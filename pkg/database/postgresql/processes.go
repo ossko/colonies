@@ -3,11 +3,11 @@ package postgresql
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"strconv"
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	"github.com/colonyos/colonies/pkg/parsers"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
@@ -875,7 +875,7 @@ func (db *PQDatabase) Assign(executorID string, process *core.Process) error {
 	}
 
 	if processFromDB.IsAssigned {
-		return errors.New("Process already assigned")
+		return dberr.Conflict("Process already assigned")
 	}
 
 	startTime := time.Now()
@@ -1030,11 +1030,11 @@ func (db *PQDatabase) MarkSuccessful(processID string) (float64, float64, error)
 	}
 
 	if process.State == core.FAILED {
-		return 0.0, 0.0, errors.New("Tried to set failed process as successful")
+		return 0.0, 0.0, dberr.Conflict("Tried to set failed process as successful")
 	}
 
 	if process.State == core.WAITING {
-		return 0.0, 0.0, errors.New("Tried to set waiting process as successful without being running")
+		return 0.0, 0.0, dberr.Conflict("Tried to set waiting process as successful without being running")
 	}
 
 	endTime := time.Now()
@@ -1064,15 +1064,15 @@ func (db *PQDatabase) MarkFailed(processID string, errs []string) error {
 	}
 
 	if process == nil {
-		return errors.New("Process with Id <" + processID + "> not found")
+		return dberr.NotFound("Process with Id <" + processID + "> not found")
 	}
 
 	if process.State == core.SUCCESS {
-		return errors.New("Tried to set successful process as failed")
+		return dberr.Conflict("Tried to set successful process as failed")
 	}
 
 	if process.State == core.FAILED {
-		return errors.New("Tried to set failed process as failed")
+		return dberr.Conflict("Tried to set failed process as failed")
 	}
 
 	sqlStatement := `UPDATE ` + db.dbPrefix + `PROCESSES SET END_TIME=$1, STATE=$2 WHERE PROCESS_ID=$3`

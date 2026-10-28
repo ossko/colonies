@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	_ "github.com/lib/pq"
 )
 
@@ -20,7 +21,7 @@ func (db *PQDatabase) AddUser(user *core.User) error {
 	}
 
 	if existingUser != nil {
-		return errors.New("User with name <" + user.Name + "> already exists in Colony with name <" + user.ColonyName + ">")
+		return dberr.AlreadyExists("User with name <" + user.Name + "> already exists in Colony with name <" + user.ColonyName + ">")
 	}
 
 	sqlStatement := `INSERT INTO  ` + db.dbPrefix + `USERS (NAME, USER_ID, COLONY_NAME, EMAIL, PHONE) VALUES ($1, $2, $3, $4, $5)`

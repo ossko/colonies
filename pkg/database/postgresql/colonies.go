@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	_ "github.com/lib/pq"
 )
 
@@ -19,7 +20,7 @@ func (db *PQDatabase) AddColony(colony *core.Colony) error {
 	}
 
 	if exitingColony != nil {
-		return errors.New("Colony with name <" + colony.Name + "> already exists")
+		return dberr.AlreadyExists("Colony with name <" + colony.Name + "> already exists")
 	}
 
 	sqlStatement := `INSERT INTO  ` + db.dbPrefix + `COLONIES (COLONY_ID, NAME) VALUES ($1, $2)`
@@ -129,7 +130,7 @@ func (db *PQDatabase) RemoveColonyByName(colonyName string) error {
 	}
 
 	if colony == nil {
-		return errors.New("Colony does not exists")
+		return dberr.NotFound("Colony does not exists")
 	}
 
 	err = db.RemoveUsersByColonyName(colony.Name)

@@ -1,11 +1,11 @@
 package postgresql
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 	"github.com/colonyos/colonies/pkg/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -153,7 +153,7 @@ func TestAddDuplicateExecutorRejected(t *testing.T) {
 	executor2.ID = core.GenerateRandomID() // Different ID, same name
 	err = db.AddExecutor(executor2)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "already exists")
+	assert.True(t, dberr.IsAlreadyExists(err), err.Error())
 
 	// Verify only one executor exists
 	executors, err := db.GetExecutorsByColonyName(colony.Name)
@@ -195,11 +195,9 @@ func TestAddDuplicateExecutorConcurrentRejected(t *testing.T) {
 			successCount++
 		} else {
 			failureCount++
-			// A loser either fails the name pre-check ("already exists") or,
-			// if it passed the check before the winner committed, the unique
-			// constraint ("not unique"); both are correct rejections
-			msg := err.Error()
-			assert.True(t, strings.Contains(msg, "already exists") || strings.Contains(msg, "not unique"), msg)
+			// A loser is rejected with kind ErrAlreadyExists, regardless of
+			// whether the name pre-check or the unique constraint caught it
+			assert.True(t, dberr.IsAlreadyExists(err), err.Error())
 		}
 	}
 

@@ -2,19 +2,21 @@ package postgresql
 
 import (
 	"database/sql"
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/colonyos/colonies/pkg/core"
+	"github.com/colonyos/colonies/pkg/database/dberr"
 )
 
 func (db *PQDatabase) AddCron(cron *core.Cron) error {
 	sqlStatement := `INSERT INTO  ` + db.dbPrefix + `CRONS (CRON_ID, COLONY_NAME, NAME, CRON_EXPR, INTERVAL, RANDOM, NEXT_RUN, LAST_RUN, WORKFLOW_SPEC, PREV_PROCESSGRAPH_ID, WAIT_FOR_PREV_PROCESSGRAPH, INITIATOR_ID, INITIATOR_NAME) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 	_, err := db.postgresql.Exec(sqlStatement, cron.ID, cron.ColonyName, cron.Name, cron.CronExpression, cron.Interval, cron.Random, cron.NextRun, cron.LastRun, cron.WorkflowSpec, cron.PrevProcessGraphID, cron.WaitForPrevProcessGraph, cron.InitiatorID, cron.InitiatorName)
 	if err != nil {
+		// TODO(phase 2): classify via lib/pq SQLSTATE 23505 (unique_violation)
+		// instead of matching the server's message text.
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return errors.New("Cron with name <" + cron.Name + "> in Colony <" + cron.ColonyName + "> already exists")
+			return dberr.AlreadyExists("Cron with name <" + cron.Name + "> in Colony <" + cron.ColonyName + "> already exists")
 		}
 		return err
 	}
