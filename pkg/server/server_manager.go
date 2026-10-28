@@ -50,6 +50,17 @@ type ServerConfig struct {
 	RetentionPeriod         int
 	StaleExecutorDuration   time.Duration
 	Enabled                 bool
+	// ClusterEnabled controls whether this server participates in clustering
+	// (etcd coordination). A nil value means enabled (the default): existing
+	// ServerConfigs keep today's behavior without changes. Single-node
+	// deployments set it explicitly to false.
+	ClusterEnabled *bool
+}
+
+// ClusteringEnabled reports whether clustering is enabled for this config,
+// with "enabled" as the default for configs that never set the field.
+func (config *ServerConfig) ClusteringEnabled() bool {
+	return config.ClusterEnabled == nil || *config.ClusterEnabled
 }
 
 // ServerManager manages multiple server backends

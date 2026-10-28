@@ -178,7 +178,7 @@ type processControllerAdapter struct {
 		AreColonyAssignmentsPaused(colonyName string) (bool, error)
 		GetEventHandler() backends.RealtimeEventHandler
 		IsLeader() bool
-		GetEtcdServer() *cluster.EtcdServer
+		GetCoordinator() cluster.Coordinator
 	}
 }
 
@@ -250,16 +250,16 @@ func (c *processControllerAdapter) IsLeader() bool {
 }
 
 func (c *processControllerAdapter) GetEtcdServer() process.EtcdServer {
-	etcdServer := c.controller.GetEtcdServer()
-	return &etcdServerAdapter{etcdServer: etcdServer}
+	coordinator := c.controller.GetCoordinator()
+	return &etcdServerAdapter{coordinator: coordinator}
 }
 
 type etcdServerAdapter struct {
-	etcdServer *cluster.EtcdServer
+	coordinator cluster.Coordinator
 }
 
 func (e *etcdServerAdapter) CurrentCluster() process.Cluster {
-	clusterConfig := e.etcdServer.CurrentCluster()
+	clusterConfig := e.coordinator.CurrentCluster()
 	return &clusterAdapter{cluster: &clusterConfig}
 }
 
@@ -466,21 +466,21 @@ func (s *ServerAdapter) ProcessgraphServer() processgraph.Server {
 // Server handler controller adapter
 type serverControllerAdapter struct {
 	controller interface {
-		GetEtcdServer() *cluster.EtcdServer
+		GetCoordinator() cluster.Coordinator
 	}
 }
 
 func (c *serverControllerAdapter) GetEtcdServer() serverhandlers.EtcdServer {
-	etcdServer := c.controller.GetEtcdServer()
-	return &serverEtcdServerAdapter{etcdServer: etcdServer}
+	coordinator := c.controller.GetCoordinator()
+	return &serverEtcdServerAdapter{coordinator: coordinator}
 }
 
 type serverEtcdServerAdapter struct {
-	etcdServer *cluster.EtcdServer
+	coordinator cluster.Coordinator
 }
 
 func (e *serverEtcdServerAdapter) CurrentCluster() cluster.Config {
-	return e.etcdServer.CurrentCluster()
+	return e.coordinator.CurrentCluster()
 }
 
 func (s *ServerAdapter) ServerController() serverhandlers.Controller {
