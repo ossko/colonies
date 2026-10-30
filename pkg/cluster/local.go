@@ -14,8 +14,9 @@ import (
 //
 // The in-memory coordination state is only correct for a single server
 // process. Deployments with more than one Colonies server sharing a database
-// must use clustering (the etcd Coordinator); startup configuration validation
-// enforces this pairing.
+// must use clustering (the etcd Coordinator). The server cannot detect other
+// servers on the same database, so the operator must ensure this; the CLI only
+// rejects --initial-cluster when clustering is disabled.
 type LocalCoordinator struct {
 	thisNode      Node
 	clusterConfig Config

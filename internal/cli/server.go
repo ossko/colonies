@@ -145,9 +145,14 @@ var serverStartCmd = &cobra.Command{
 		parseEnv()
 
 		// Clustering can be disabled with COLONIES_CLUSTER for single-node
-		// deployments; the --cluster flag takes precedence when set explicitly.
-		if clusterStr := os.Getenv("COLONIES_CLUSTER"); clusterStr != "" {
-			ClusterEnabled = clusterStr == "true"
+		// deployments. An explicit --cluster flag takes precedence over the
+		// environment variable.
+		if clusterStr := os.Getenv("COLONIES_CLUSTER"); clusterStr != "" && !cmd.Flags().Changed("cluster") {
+			clusterEnabled, err := strconv.ParseBool(clusterStr)
+			if err != nil {
+				CheckError(errors.New("Invalid COLONIES_CLUSTER value: " + clusterStr + " (expected true or false)"))
+			}
+			ClusterEnabled = clusterEnabled
 			log.WithField("ClusterEnabled", ClusterEnabled).Info("Using COLONIES_CLUSTER from environment")
 		}
 
@@ -303,7 +308,7 @@ var serverStartCmd = &cobra.Command{
 			clusterConfig.AddNode(node)
 		}
 
-		if EtcdDataDir == "" {
+		if EtcdDataDir == "" && ClusterEnabled {
 			EtcdDataDir = "/tmp/colonies/prod/etcd"
 			log.Warning("EtcdDataDir not specified, setting it to " + EtcdDataDir)
 		}

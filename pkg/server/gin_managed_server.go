@@ -34,7 +34,7 @@ func NewGinManagedServer(config *ServerConfig, sharedResources *SharedResources)
 		config.TLSCertPath,
 		sharedResources.ThisNode,
 		sharedResources.ClusterConfig,
-		config.ClusteringEnabled(),
+		!config.ClusterDisabled,
 		sharedResources.EtcdDataPath,
 		sharedResources.GeneratorPeriod,
 		sharedResources.CronPeriod,
